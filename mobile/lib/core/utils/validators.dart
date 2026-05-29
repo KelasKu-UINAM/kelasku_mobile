@@ -63,6 +63,19 @@ class Validators {
     return null;
   }
 
+  static String? academicYear(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final pattern = RegExp(r'^\d{4}\/\d{4}$');
+    if (!pattern.hasMatch(value.trim())) {
+      return 'Format: 2025/2026 (tahun akademik)';
+    }
+    final parts = value.trim().split('/');
+    final y1 = int.parse(parts[0]);
+    final y2 = int.parse(parts[1]);
+    if (y2 != y1 + 1) return 'Format: 2025/2026 (tahun akademik)';
+    return null;
+  }
+
   static String normalizePhone(String value) {
     final cleaned = value.replaceAll(RegExp(r'[\s+\-()]'), '');
     if (cleaned.startsWith('0')) {
