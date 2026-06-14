@@ -19,6 +19,10 @@ import 'features/schedules/screens/schedule_form_screen.dart';
 import 'features/schedules/screens/schedule_screen.dart';
 import 'features/subjects/screens/subject_form_screen.dart';
 import 'features/subjects/screens/subject_list_screen.dart';
+import 'features/announcements/screens/announcement_detail_screen.dart';
+import 'features/announcements/screens/announcement_form_screen.dart';
+import 'features/announcements/screens/announcement_list_screen.dart';
+import 'features/classes/providers/class_provider.dart';
 import 'features/tasks/screens/task_detail_screen.dart';
 import 'features/tasks/screens/task_form_screen.dart';
 import 'features/tasks/screens/task_list_screen.dart';
@@ -229,6 +233,48 @@ final GoRouter _router = GoRouter(
       },
     ),
 
+    // ── Pengumuman routes ─────────────────────────────────────────
+    GoRoute(
+      path: '/pengumuman',
+      name: 'pengumuman-list',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return AnnouncementListScreen(classId: classId);
+      },
+    ),
+    GoRoute(
+      path: '/pengumuman/tambah',
+      name: 'pengumuman-tambah',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return AnnouncementFormScreen(classId: classId);
+      },
+    ),
+    GoRoute(
+      path: '/pengumuman/:id/edit',
+      name: 'pengumuman-edit',
+      builder: (_, state) {
+        final id =
+            int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return AnnouncementFormScreen(classId: classId, announcementId: id);
+      },
+    ),
+    GoRoute(
+      path: '/pengumuman/:id',
+      name: 'pengumuman-detail',
+      builder: (_, state) {
+        final id =
+            int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return AnnouncementDetailScreen(classId: classId, announcementId: id);
+      },
+    ),
+
     // ── Mata Kuliah routes ────────────────────────────────────────
     GoRoute(
       path: '/matkul/:classId',
@@ -345,6 +391,14 @@ class _LainnyaPlaceholder extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Ensure classes are loaded even if Lainnya is the first tab visited.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(classProvider.notifier).fetchClasses();
+    });
+
+    final classes = ref.watch(classProvider).classes;
+    final activeClassId = classes.isEmpty ? null : classes.first.id;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -372,8 +426,10 @@ class _LainnyaPlaceholder extends ConsumerWidget {
           _MenuTile(
             icon: Icons.campaign_outlined,
             label: 'Pengumuman',
-            subtitle: 'Akan dibuat di Phase 7',
-            onTap: null,
+            subtitle: 'Pengumuman dari komting',
+            onTap: activeClassId != null
+                ? () => context.push('/pengumuman?classId=$activeClassId')
+                : null,
           ),
           _MenuTile(
             icon: Icons.account_balance_wallet_outlined,
