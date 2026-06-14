@@ -23,6 +23,8 @@ import 'features/announcements/screens/announcement_detail_screen.dart';
 import 'features/announcements/screens/announcement_form_screen.dart';
 import 'features/announcements/screens/announcement_list_screen.dart';
 import 'features/classes/providers/class_provider.dart';
+import 'features/payments/screens/payment_form_screen.dart';
+import 'features/payments/screens/payment_list_screen.dart';
 import 'features/tasks/screens/task_detail_screen.dart';
 import 'features/tasks/screens/task_form_screen.dart';
 import 'features/tasks/screens/task_list_screen.dart';
@@ -233,6 +235,26 @@ final GoRouter _router = GoRouter(
       },
     ),
 
+    // ── Iuran routes ─────────────────────────────────────────────
+    GoRoute(
+      path: '/iuran',
+      name: 'iuran',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return PaymentListScreen(classId: classId);
+      },
+    ),
+    GoRoute(
+      path: '/iuran/tambah',
+      name: 'iuran-tambah',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return PaymentFormScreen(classId: classId);
+      },
+    ),
+
     // ── Pengumuman routes ─────────────────────────────────────────
     GoRoute(
       path: '/pengumuman',
@@ -434,8 +456,10 @@ class _LainnyaPlaceholder extends ConsumerWidget {
           _MenuTile(
             icon: Icons.account_balance_wallet_outlined,
             label: 'Iuran',
-            subtitle: 'Akan dibuat di Phase 8',
-            onTap: null,
+            subtitle: 'Tagihan iuran kelas',
+            onTap: activeClassId != null
+                ? () => context.push('/iuran?classId=$activeClassId')
+                : null,
           ),
           _MenuTile(
             icon: Icons.person_outline,
