@@ -15,6 +15,10 @@ import 'features/classes/screens/create_class_screen.dart';
 import 'features/classes/screens/edit_class_screen.dart';
 import 'features/classes/screens/join_class_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
+import 'features/schedules/screens/schedule_form_screen.dart';
+import 'features/schedules/screens/schedule_screen.dart';
+import 'features/subjects/screens/subject_form_screen.dart';
+import 'features/subjects/screens/subject_list_screen.dart';
 
 class KelaskuApp extends StatelessWidget {
   const KelaskuApp({super.key});
@@ -132,8 +136,7 @@ final GoRouter _router = GoRouter(
             GoRoute(
               path: '/jadwal',
               name: 'jadwal',
-              builder: (_, _) =>
-                  const _PhasePlaceholder(tab: MainTab.jadwal, phase: 5),
+              builder: (_, _) => const ScheduleScreen(),
             ),
           ],
         ),
@@ -167,6 +170,59 @@ final GoRouter _router = GoRouter(
           ],
         ),
       ],
+    ),
+
+    // ── Jadwal detail routes ──────────────────────────────────────
+    GoRoute(
+      path: '/jadwal/tambah',
+      name: 'jadwal-tambah',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return ScheduleFormScreen(classId: classId);
+      },
+    ),
+    GoRoute(
+      path: '/jadwal/:scheduleId/edit',
+      name: 'jadwal-edit',
+      builder: (_, state) {
+        final scheduleId =
+            int.tryParse(state.pathParameters['scheduleId'] ?? '') ?? 0;
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return ScheduleFormScreen(classId: classId, scheduleId: scheduleId);
+      },
+    ),
+
+    // ── Mata Kuliah routes ────────────────────────────────────────
+    GoRoute(
+      path: '/matkul/:classId',
+      name: 'matkul-list',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.pathParameters['classId'] ?? '') ?? 0;
+        return SubjectListScreen(classId: classId);
+      },
+    ),
+    GoRoute(
+      path: '/matkul/:classId/tambah',
+      name: 'matkul-tambah',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.pathParameters['classId'] ?? '') ?? 0;
+        return SubjectFormScreen(classId: classId);
+      },
+    ),
+    GoRoute(
+      path: '/matkul/:subjectId/edit',
+      name: 'matkul-edit',
+      builder: (_, state) {
+        final subjectId =
+            int.tryParse(state.pathParameters['subjectId'] ?? '') ?? 0;
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return SubjectFormScreen(classId: classId, subjectId: subjectId);
+      },
     ),
 
     // ── Detail routes (di luar shell, push navigation) ───────────
