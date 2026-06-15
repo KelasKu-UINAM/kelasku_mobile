@@ -51,14 +51,11 @@ class _PaymentListScreenState extends ConsumerState<PaymentListScreen> {
           ? FloatingActionButton(
               heroTag: 'payment_fab',
               onPressed: () async {
-                final result = await context.push<bool>(
+                // createPayments appends to state reactively; a forceRefresh
+                // here would re-seed the dummy data and wipe the new bills.
+                await context.push<bool>(
                   '/iuran/tambah?classId=${widget.classId}',
                 );
-                if (result == true && mounted) {
-                  ref
-                      .read(paymentProvider(widget.classId).notifier)
-                      .fetchPayments(forceRefresh: true);
-                }
               },
               child: const Icon(Icons.add),
             )

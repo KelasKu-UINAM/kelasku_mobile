@@ -70,14 +70,11 @@ class _ForumListScreenState extends ConsumerState<ForumListScreen> {
           ? FloatingActionButton(
               heroTag: 'forum_fab',
               onPressed: () async {
-                final result = await context.push<bool>(
+                // createForum appends to state reactively; a forceRefresh here
+                // would re-seed the dummy data and wipe the new forum.
+                await context.push<bool>(
                   '/forum/buat?classId=$classId',
                 );
-                if (result == true && mounted) {
-                  ref
-                      .read(forumProvider(classId).notifier)
-                      .fetchForums(forceRefresh: true);
-                }
               },
               child: const Icon(Icons.add),
             )
