@@ -254,9 +254,37 @@ final classByIdProvider = Provider.family<ClassModel?, int>((ref, id) {
       );
 });
 
-final classMembersProvider = FutureProvider.family.autoDispose<List<ClassMember>, int>(
-  (ref, classId) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    return _dummyMembers.where((m) => m.classId == classId).toList();
-  },
+// ── Member notifier (per class) ───────────────────────────────
+
+class MemberNotifier extends StateNotifier<List<ClassMember>> {
+  MemberNotifier(int classId)
+      : super(_dummyMembers.where((m) => m.classId == classId).toList());
+
+  void updateMemberRole(int userId, String newRoleInClass) {
+    state = [
+      for (final m in state)
+        if (m.userId == userId)
+          ClassMember(
+            id: m.id,
+            classId: m.classId,
+            userId: m.userId,
+            name: m.name,
+            email: m.email,
+            phone: m.phone,
+            roleInClass: newRoleInClass,
+            joinedAt: m.joinedAt,
+          )
+        else
+          m,
+    ];
+  }
+
+  void removeMember(int userId) {
+    state = state.where((m) => m.userId != userId).toList();
+  }
+}
+
+final memberProvider =
+    StateNotifierProvider.family<MemberNotifier, List<ClassMember>, int>(
+  (ref, classId) => MemberNotifier(classId),
 );

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../core/widgets/role_badge.dart';
 import '../../auth/models/user_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../classes/providers/class_provider.dart';
@@ -46,7 +45,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            _ProfileRow(user: user, role: role, showRole: isManager),
+            _ProfileRow(user: user),
             const Divider(height: 0.5, thickness: 0.5, color: _dividerColor),
 
             // ── AKADEMIK ──────────────────────────────────────────
@@ -214,14 +213,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
 class _ProfileRow extends StatelessWidget {
   final User? user;
-  final String? role;
-  final bool showRole;
 
-  const _ProfileRow({
-    required this.user,
-    required this.role,
-    required this.showRole,
-  });
+  const _ProfileRow({required this.user});
 
   String get _initial {
     final t = (user?.name ?? '').trim();
@@ -275,10 +268,6 @@ class _ProfileRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (showRole) ...[
-                  const SizedBox(height: 6),
-                  RoleBadge.fromApi(role),
-                ],
               ],
             ),
           ),

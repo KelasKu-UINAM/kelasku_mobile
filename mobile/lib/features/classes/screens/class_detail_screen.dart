@@ -5,9 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/empty_state_widget.dart';
-import '../../../core/widgets/loading_widget.dart';
 import '../../../core/widgets/role_badge.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/class_member_model.dart';
 import '../models/class_model.dart';
 import '../providers/class_provider.dart';
@@ -238,12 +239,7 @@ class _StatRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final membersAsync = ref.watch(classMembersProvider(kelas.id));
-
-    final memberCount = membersAsync.maybeWhen(
-      data: (m) => m.length,
-      orElse: () => 0,
-    );
+    final memberCount = ref.watch(memberProvider(kelas.id)).length;
 
     return Row(
       children: [
@@ -452,94 +448,167 @@ class _AnggotaTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final membersAsync = ref.watch(classMembersProvider(classId));
+    // Only komting may view/manage members.
+    if (!isAdmin) {
+      return const EmptyStateWidget(
+        icon: Icons.lock_outline,
+        title: 'Akses terbatas',
+        description: 'Hanya komting yang bisa melihat anggota kelas.',
+      );
+    }
 
-    return membersAsync.when(
-      loading: () => const LoadingWidget(message: 'Memuat anggota...'),
-      error: (_, _) => const EmptyStateWidget(
-        icon: Icons.error_outline,
-        title: 'Gagal memuat anggota',
-      ),
-      data: (members) {
-        if (members.isEmpty) {
-          return const EmptyStateWidget(
-            icon: Icons.group_outlined,
-            title: 'Belum ada anggota',
-          );
-        }
+    final members = ref.watch(memberProvider(classId));
+    final classCode = ref.watch(classByIdProvider(classId))?.classCode ?? '';
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+    if (members.isEmpty) {
+      return const EmptyStateWidget(
+        icon: Icons.group_outlined,
+        title: 'Belum ada anggota',
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${members.length} anggota',
-                    style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+            Expanded(
+              child: Text(
+                '${members.length} anggota',
+                style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 9),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+            border: const Border.fromBorderSide(BorderSide(color: AppColors.border)),
+          ),
+          child: Column(
+            children: [
+              for (var i = 0; i < members.length; i++)
+                _MemberRow(
+                  classId: classId,
+                  member: members[i],
+                  isLast: i == members.length - 1,
+                  showMenu: true,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: () => _showShareCode(context, classCode),
+          icon: const Icon(Icons.share_outlined, size: 18),
+          label: const Text('Bagikan Kode Kelas'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            side: const BorderSide(color: AppColors.primary),
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showShareCode(BuildContext context, String code) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('Bagikan Kode Kelas', style: AppTextStyles.h3),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryOverlay,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    width: 0.5,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 9),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(12),
-                border: const Border.fromBorderSide(BorderSide(color: AppColors.border)),
+                child: Text(
+                  code.isEmpty ? '—' : code,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
               ),
-              child: Column(
-                children: [
-                  for (var i = 0; i < members.length; i++)
-                    _MemberRow(
-                      member: members[i],
-                      isLast: i == members.length - 1,
-                      showMenu: isAdmin,
-                    ),
-                ],
+              const SizedBox(height: 14),
+              CustomButton(
+                label: 'Salin Kode',
+                icon: Icons.copy_rounded,
+                onPressed: code.isEmpty
+                    ? null
+                    : () {
+                        Clipboard.setData(ClipboardData(text: code));
+                        Navigator.pop(sheetCtx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Kode kelas disalin')),
+                        );
+                      },
               ),
-            ),
-            if (isAdmin) ...[
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Manajemen anggota akan ada di Phase 10.'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.person_add_outlined, size: 18),
-                label: const Text('Tambah Anggota'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 12),
+              Text(
+                'Bagikan kode ini agar mahasiswa bisa join melalui menu '
+                'Gabung Kelas.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodySmall.copyWith(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                  height: 1.5,
                 ),
               ),
             ],
-          ],
-        );
-      },
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _MemberRow extends StatelessWidget {
+class _MemberRow extends ConsumerWidget {
+  final int classId;
   final ClassMember member;
   final bool isLast;
   final bool showMenu;
 
   const _MemberRow({
+    required this.classId,
     required this.member,
     this.isLast = false,
     this.showMenu = false,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
@@ -605,7 +674,7 @@ class _MemberRow extends StatelessWidget {
               padding: const EdgeInsets.only(left: 4),
               child: IconButton(
                 icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
-                onPressed: () => _showMemberMenu(context),
+                onPressed: () => _showMemberMenu(context, ref),
                 tooltip: 'Opsi anggota',
                 splashRadius: 20,
               ),
@@ -620,13 +689,13 @@ class _MemberRow extends StatelessWidget {
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
-  void _showMemberMenu(BuildContext context) {
+  void _showMemberMenu(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => SafeArea(
+      builder: (sheetCtx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -642,43 +711,147 @@ class _MemberRow extends StatelessWidget {
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                member.name,
-                style: AppTextStyles.sectionTitle,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(member.name, style: AppTextStyles.sectionTitle),
               ),
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.manage_accounts_outlined, color: AppColors.primary),
+              leading: const Icon(Icons.manage_accounts_outlined,
+                  color: AppColors.primary),
               title: const Text('Ubah Role'),
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ubah role ada di Phase 10.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+                Navigator.pop(sheetCtx);
+                _changeRole(context, ref);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.person_remove_outlined, color: AppColors.statusRed),
-              title: Text('Keluarkan dari Kelas',
+              leading: const Icon(Icons.person_remove_outlined,
+                  color: AppColors.statusRed),
+              title: const Text('Keluarkan dari Kelas',
                   style: TextStyle(color: AppColors.statusRed)),
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Hapus anggota ada di Phase 10.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+                Navigator.pop(sheetCtx);
+                _confirmRemove(context, ref);
               },
             ),
             const SizedBox(height: 8),
           ],
         ),
       ),
+    );
+  }
+
+  // Demoting/removing the last komting would leave the class without one.
+  bool _isLastAdmin(WidgetRef ref) {
+    if (member.roleInClass != 'admin_komting') return false;
+    final adminCount = ref
+        .read(memberProvider(classId))
+        .where((m) => m.roleInClass == 'admin_komting')
+        .length;
+    return adminCount <= 1;
+  }
+
+  void _changeRole(BuildContext context, WidgetRef ref) {
+    const roleOptions = [
+      ('mahasiswa', 'Mahasiswa'),
+      ('bendahara', 'Bendahara'),
+      ('admin_komting', 'Komting'),
+    ];
+    var selected = member.roleInClass;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setStateDialog) => AlertDialog(
+          title: const Text('Ubah Role'),
+          content: RadioGroup<String>(
+            groupValue: selected,
+            onChanged: (v) => setStateDialog(() => selected = v ?? selected),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final opt in roleOptions)
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    value: opt.$1,
+                    title: Text(opt.$2),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () {
+                final isSelf =
+                    member.userId == ref.read(currentUserProvider)?.id;
+                if (_isLastAdmin(ref) && selected != 'admin_komting') {
+                  Navigator.pop(dialogCtx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isSelf
+                          ? 'Anda satu-satunya komting. Tunjuk komting lain sebelum mengubah role Anda.'
+                          : 'Kelas harus memiliki minimal satu komting.'),
+                    ),
+                  );
+                  return;
+                }
+                ref
+                    .read(memberProvider(classId).notifier)
+                    .updateMemberRole(member.userId, selected);
+                Navigator.pop(dialogCtx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Role berhasil diubah')),
+                );
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {
+    final isSelf = member.userId == ref.read(currentUserProvider)?.id;
+    if (_isLastAdmin(ref)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isSelf
+              ? 'Anda satu-satunya komting dan tidak bisa keluar. Tunjuk komting lain dulu.'
+              : 'Komting terakhir tidak bisa dikeluarkan. Tunjuk komting lain dulu.'),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Keluarkan Anggota?'),
+        content: Text('Keluarkan ${member.name} dari kelas ini?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Keluarkan',
+                style: TextStyle(color: AppColors.dangerText)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    ref.read(memberProvider(classId).notifier).removeMember(member.userId);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Anggota dikeluarkan')),
     );
   }
 }
