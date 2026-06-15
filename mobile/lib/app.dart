@@ -28,6 +28,8 @@ import 'features/forums/screens/forum_form_screen.dart';
 import 'features/forums/screens/forum_list_screen.dart';
 import 'features/payments/screens/payment_form_screen.dart';
 import 'features/payments/screens/payment_list_screen.dart';
+import 'features/settings/screens/profile_screen.dart';
+import 'features/settings/screens/whatsapp_config_screen.dart';
 import 'features/tasks/screens/task_detail_screen.dart';
 import 'features/tasks/screens/task_form_screen.dart';
 import 'features/tasks/screens/task_list_screen.dart';
@@ -257,6 +259,22 @@ final GoRouter _router = GoRouter(
       },
     ),
 
+    // ── Settings & Profil routes ─────────────────────────────────
+    GoRoute(
+      path: '/profil',
+      name: 'profil',
+      builder: (_, _) => const ProfileScreen(),
+    ),
+    GoRoute(
+      path: '/pengaturan/whatsapp',
+      name: 'pengaturan-whatsapp',
+      builder: (_, state) {
+        final classId =
+            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
+        return WhatsappConfigScreen(classId: classId);
+      },
+    ),
+
     // ── Forum routes ─────────────────────────────────────────────
     GoRoute(
       path: '/forum/buat',
@@ -446,8 +464,8 @@ class _LainnyaPlaceholder extends ConsumerWidget {
           _MenuTile(
             icon: Icons.person_outline,
             label: 'Profil Saya',
-            subtitle: 'Akan dibuat di Phase 10',
-            onTap: null,
+            subtitle: 'Akun & pengaturan',
+            onTap: () => context.push('/profil'),
           ),
         ],
       ),
