@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../classes/providers/class_provider.dart';
 import '../models/announcement_model.dart';
 import '../providers/announcement_provider.dart';
@@ -25,8 +26,9 @@ class AnnouncementDetailScreen extends ConsumerWidget {
           (classId: classId, announcementId: announcementId)),
     );
     final kelas = ref.watch(classByIdProvider(classId));
-    // admin_komting dapat selalu modify; bendahara hanya jika dia yang membuat
-    // (untuk dummy: hanya admin_komting, karena createdBy selalu 1 = admin dummy)
+    final currentUserId = ref.watch(currentUserProvider)?.id;
+    // admin_komting dapat selalu modify; pembuat (mis. bendahara) hanya untuk
+    // pengumuman buatannya sendiri — sesuai ensureCanModifyAnnouncement backend.
     final isAdmin = kelas?.roleInClass == 'admin_komting';
 
     if (announcement == null) {
@@ -39,11 +41,15 @@ class AnnouncementDetailScreen extends ConsumerWidget {
       );
     }
 
+    final canModify = isAdmin ||
+        (announcement.createdBy != null &&
+            announcement.createdBy == currentUserId);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Detail Pengumuman'),
-        actions: isAdmin
+        actions: canModify
             ? [
                 IconButton(
                   tooltip: 'Edit pengumuman',

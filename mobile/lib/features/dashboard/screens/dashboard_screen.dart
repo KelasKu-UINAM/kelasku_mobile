@@ -57,7 +57,7 @@ class _DashboardBody extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(14, 16, 14, 24),
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
-                const _ShortcutGrid(),
+                _ShortcutGrid(activeClassId: data.activeClass?.id),
                 const SizedBox(height: 18),
                 _ScheduleSection(items: data.todaySchedules),
                 const SizedBox(height: 20),
@@ -68,7 +68,10 @@ class _DashboardBody extends StatelessWidget {
                   const SizedBox(height: 20),
                 ],
                 if (data.iuranSummary != null)
-                  _IuranSummarySection(summary: data.iuranSummary!),
+                  _IuranSummarySection(
+                    summary: data.iuranSummary!,
+                    classId: data.activeClass?.id,
+                  ),
               ],
             ),
           ),
@@ -169,14 +172,7 @@ class _ActiveClassRow extends StatelessWidget {
     return Material(
       color: AppColors.backgroundAlt,
       child: InkWell(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Detail kelas akan dibuat di Phase 4.'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        },
+        onTap: () => context.push('/kelas/${activeClass.id}'),
         child: Container(
           decoration: const BoxDecoration(
             border: Border(
@@ -220,7 +216,9 @@ class _ActiveClassRow extends StatelessWidget {
 }
 
 class _ShortcutGrid extends StatelessWidget {
-  const _ShortcutGrid();
+  final int? activeClassId;
+
+  const _ShortcutGrid({this.activeClassId});
 
   @override
   Widget build(BuildContext context) {
@@ -235,18 +233,15 @@ class _ShortcutGrid extends StatelessWidget {
         children: [
           _ShortcutItem(label: 'Jadwal', icon: Icons.calendar_today_outlined, onTap: () => context.go('/jadwal')),
           _ShortcutItem(label: 'Tugas', icon: Icons.assignment_outlined, onTap: () => context.go('/tugas')),
-          _ShortcutItem(label: 'Iuran', icon: Icons.account_balance_wallet_outlined, onTap: () => _comingSoon(context, 'Iuran')),
+          _ShortcutItem(
+            label: 'Iuran',
+            icon: Icons.account_balance_wallet_outlined,
+            onTap: () => activeClassId != null
+                ? context.push('/iuran?classId=$activeClassId')
+                : context.push('/kelas'),
+          ),
           _ShortcutItem(label: 'Forum', icon: Icons.chat_bubble_outline, onTap: () => context.go('/forum')),
         ],
-      ),
-    );
-  }
-
-  void _comingSoon(BuildContext context, String name) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$name akan dibuat di phase berikutnya.'),
-        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -644,8 +639,9 @@ class _AnnouncementSection extends StatelessWidget {
 
 class _IuranSummarySection extends StatelessWidget {
   final IuranSummary summary;
+  final int? classId;
 
-  const _IuranSummarySection({required this.summary});
+  const _IuranSummarySection({required this.summary, this.classId});
 
   @override
   Widget build(BuildContext context) {
@@ -676,14 +672,9 @@ class _IuranSummarySection extends StatelessWidget {
                     ),
                   ),
                   InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Detail iuran akan dibuat di Phase 8.'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
+                    onTap: () => classId != null
+                        ? context.push('/iuran?classId=$classId')
+                        : context.push('/kelas'),
                     borderRadius: BorderRadius.circular(6),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

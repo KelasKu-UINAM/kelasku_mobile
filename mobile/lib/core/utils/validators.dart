@@ -19,7 +19,8 @@ class Validators {
     return null;
   }
 
-  static String? password(String? value, {int minLength = 8}) {
+  // Default min length 6 to match backend register rule (min 6).
+  static String? password(String? value, {int minLength = 6}) {
     if (value == null || value.isEmpty) {
       return 'Password tidak boleh kosong';
     }
@@ -49,6 +50,28 @@ class Validators {
     final pattern = RegExp(r'^(62|0)8[1-9]\d{6,11}$');
     if (!pattern.hasMatch(cleaned)) {
       return 'Format no HP tidak valid';
+    }
+    return null;
+  }
+
+  // Optional phone (backend register allows empty phone). Validates format
+  // only when a value is provided.
+  static String? phoneOptional(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return phone(value);
+  }
+
+  // Optional http/https URL. Empty is allowed; otherwise must parse with a
+  // valid scheme + host (matches backend isURL on attachment_url).
+  static String? urlOptional(String? value) {
+    final s = value?.trim() ?? '';
+    if (s.isEmpty) return null;
+    final uri = Uri.tryParse(s);
+    if (uri == null ||
+        !uri.hasScheme ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        !uri.hasAuthority) {
+      return 'URL tidak valid';
     }
     return null;
   }

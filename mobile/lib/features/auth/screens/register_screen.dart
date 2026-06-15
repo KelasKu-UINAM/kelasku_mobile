@@ -40,11 +40,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
 
+    final phoneText = _phoneCtrl.text.trim();
     final user = await ref.read(authProvider.notifier).register(
           name: _nameCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
-          phone: Validators.normalizePhone(_phoneCtrl.text),
+          phone: phoneText.isEmpty
+              ? null
+              : Validators.normalizePhone(phoneText),
         );
 
     if (!mounted || user == null) return;
@@ -175,7 +178,7 @@ class _FormCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           CustomTextField(
-            label: 'Nomor HP',
+            label: 'Nomor HP (opsional)',
             hint: '+62 8xx xxxx xxxx',
             controller: phoneCtrl,
             keyboardType: TextInputType.phone,
@@ -184,7 +187,7 @@ class _FormCard extends StatelessWidget {
               FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-()]')),
               LengthLimitingTextInputFormatter(20),
             ],
-            validator: Validators.phone,
+            validator: Validators.phoneOptional,
             enabled: !isLoading,
             onChanged: (_) => onFieldChange(),
           ),

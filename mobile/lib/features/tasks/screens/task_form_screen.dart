@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/utils/validators.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/loading_widget.dart';
@@ -248,6 +249,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                     keyboardType: TextInputType.url,
                     textInputAction: TextInputAction.done,
                     prefixIcon: Icons.link_outlined,
+                    validator: Validators.urlOptional,
                   ),
                   const SizedBox(height: 20),
 

@@ -71,11 +71,14 @@ class AuthService {
       throw const AuthException('Email sudah terdaftar', statusCode: 409);
     }
 
+    // Backend treats phone as optional — send null when empty.
+    final normalizedPhone = (phone == null || phone.isEmpty) ? null : phone;
+
     return User(
       id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       name: name,
       email: email,
-      phone: phone,
+      phone: normalizedPhone,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );

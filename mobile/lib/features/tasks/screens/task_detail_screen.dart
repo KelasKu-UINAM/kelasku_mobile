@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -234,17 +235,37 @@ class _AttachmentTile extends StatelessWidget {
 
   const _AttachmentTile({required this.url});
 
+  Future<void> _open(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('URL lampiran tidak valid')),
+      );
+      return;
+    }
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Tidak dapat membuka lampiran')),
+      );
+    }
+  }
+
+  void _copy(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: url));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('URL disalin ke clipboard')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        Clipboard.setData(ClipboardData(text: url));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('URL disalin ke clipboard')),
-        );
-      },
+      onTap: () => _open(context),
+      onLongPress: () => _copy(context),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        padding: const EdgeInsets.fromLTRB(13, 12, 6, 12),
         decoration: BoxDecoration(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(12),
@@ -267,6 +288,14 @@ class _AttachmentTile extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+            ),
+            IconButton(
+              tooltip: 'Salin URL',
+              icon: const Icon(Icons.copy_rounded, size: 16,
+                  color: AppColors.textMuted),
+              onPressed: () => _copy(context),
+              splashRadius: 18,
+              visualDensity: VisualDensity.compact,
             ),
           ],
         ),
