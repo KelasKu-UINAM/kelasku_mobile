@@ -6,17 +6,33 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../classes/providers/class_provider.dart';
 import '../models/dashboard_model.dart';
 import '../providers/dashboard_provider.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Trigger class loading from the widget; dashboardProvider only reads it.
+    Future.microtask(() => ref.read(classProvider.notifier).fetchClasses());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(dashboardProvider);
 
     return dashboardAsync.when(
+      // Keep showing data while it reloads (e.g. when classes finish loading)
+      // instead of flashing the loading spinner.
+      skipLoadingOnReload: true,
       loading: () => const LoadingWidget(message: 'Memuat beranda...'),
       error: (e, _) => _ErrorView(
         message: 'Gagal memuat beranda',

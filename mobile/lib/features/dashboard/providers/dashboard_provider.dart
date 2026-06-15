@@ -23,10 +23,10 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   ref.keepAlive();
   final user = ref.watch(currentUserProvider);
 
-  // Ensure the user's classes are loaded so the "Kelas Aktif" link resolves
-  // to a real class in ClassDetailScreen (classByIdProvider).
-  await ref.read(classProvider.notifier).fetchClasses();
-  final classes = ref.read(classListProvider);
+  // Read the user's classes reactively. DashboardScreen triggers fetchClasses
+  // (side effects belong in the widget) — a provider must NOT mutate
+  // classProvider here, as that throws during initialization.
+  final classes = ref.watch(classListProvider);
   final firstClass = classes.isEmpty ? null : classes.first;
 
   await Future<void>.delayed(const Duration(milliseconds: 350));
