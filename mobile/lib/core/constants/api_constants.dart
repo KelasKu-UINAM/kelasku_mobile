@@ -1,9 +1,9 @@
-import 'package:dotenv/dotenv.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConstants {
   ApiConstants._();
 
-  static const String baseUrl = dotenv.env['API_URL'] ?? 'http://localhost:3000';
+  static final String baseUrl = dotenv.env['API_URL'] ?? 'http://10.0.2.2:3000';
 
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
