@@ -47,8 +47,8 @@ class _SubjectListScreenState extends ConsumerState<SubjectListScreen> {
           ? FloatingActionButton(
               heroTag: 'matkul_fab',
               onPressed: () async {
-                // createSubject appends to state reactively; a forceRefresh
-                // here would re-seed the dummy data and wipe the new subject.
+                // createSubject refetches the list from API after creation;
+                // no manual refresh needed here.
                 await context.push<bool>(
                   '/matkul/${widget.classId}/tambah',
                 );

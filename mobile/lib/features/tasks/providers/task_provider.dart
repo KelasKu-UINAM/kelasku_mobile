@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../models/task_model.dart';
 
 @immutable
@@ -36,91 +39,28 @@ class TaskNotifier extends StateNotifier<TaskState> {
 
   Future<void> fetchTasks({bool forceRefresh = false}) async {
     if (_loaded && !forceRefresh) return;
-    state = state.copyWith(isLoading: true);
-    await Future.delayed(const Duration(milliseconds: 400));
-
-    // Dummy hanya tersedia untuk kelas id=1; kelas lain tampil kosong.
-    if (_classId != 1) {
-      state = state.copyWith(tasks: const [], isLoading: false);
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.classes}/$_classId/tasks',
+      );
+      final data = extractData(response) as List<dynamic>;
+      final tasks = data
+          .map((e) => TaskModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      state = state.copyWith(tasks: tasks, isLoading: false);
       _loaded = true;
-      return;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
     }
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    DateTime dl(int daysFromNow) {
-      final base = daysFromNow >= 0
-          ? today.add(Duration(days: daysFromNow))
-          : today.subtract(Duration(days: -daysFromNow));
-      return DateTime(base.year, base.month, base.day, 23, 59);
-    }
-
-    final dummy = [
-      TaskModel(
-        id: 1,
-        subjectId: 3,
-        subjectName: 'Statistika',
-        subjectCode: 'MTK-403',
-        title: 'Tugas Analisis Data Deskriptif',
-        description:
-            'Hitung mean, median, modus, dan standar deviasi dari dataset yang disediakan. Kumpulkan dalam format PDF melalui portal kelas.',
-        deadline: dl(-3),
-        attachmentUrl: null,
-        createdBy: 1,
-      ),
-      TaskModel(
-        id: 2,
-        subjectId: 2,
-        subjectName: 'Aljabar Linear',
-        subjectCode: 'MTK-402',
-        title: 'Quiz Bab 4: Transformasi Linear',
-        description:
-            'Quiz online melalui portal Siakad. Materi: kernel, image, rank, nullity. Durasi 45 menit, hanya satu kali percobaan.',
-        deadline: dl(2),
-        attachmentUrl: 'https://siakad.uin-alauddin.ac.id/quiz/alj-402',
-        createdBy: 1,
-      ),
-      TaskModel(
-        id: 3,
-        subjectId: 4,
-        subjectName: 'Pemrograman Komputer',
-        subjectCode: 'MTK-404',
-        title: 'Laporan Praktikum Modul 5',
-        description:
-            'Buat laporan praktikum tentang struktur data array dan linked list. Format: docx, minimal 5 halaman.',
-        deadline: dl(3),
-        attachmentUrl: null,
-        createdBy: 1,
-      ),
-      TaskModel(
-        id: 4,
-        subjectId: 1,
-        subjectName: 'Analisis Real',
-        subjectCode: 'MTK-401',
-        title: 'Makalah Integral Riemann',
-        description:
-            'Tulis makalah 10–15 halaman tentang teorema fundamental kalkulus beserta contoh penerapannya dalam Analisis Real.',
-        deadline: dl(11),
-        attachmentUrl: null,
-        createdBy: 1,
-      ),
-      TaskModel(
-        id: 5,
-        subjectId: 4,
-        subjectName: 'Pemrograman Komputer',
-        subjectCode: 'MTK-404',
-        title: 'Project Akhir: Aplikasi CLI',
-        description:
-            'Buat program CLI berbasis Python atau C++ yang menyelesaikan satu permasalahan nyata. Kumpulkan beserta dokumentasi README.',
-        deadline: dl(21),
-        attachmentUrl: 'https://classroom.google.com/c/proj-akhir-mtk404',
-        createdBy: 1,
-      ),
-    ];
-
-    state = state.copyWith(tasks: dummy, isLoading: false);
-    _loaded = true;
   }
 
   Future<void> createTask({
@@ -132,23 +72,23 @@ class TaskNotifier extends StateNotifier<TaskState> {
     required DateTime deadline,
     String? attachmentUrl,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final newId = state.tasks.isEmpty
-        ? 1
-        : state.tasks.map((t) => t.id).reduce((a, b) => a > b ? a : b) + 1;
-    final task = TaskModel(
-      id: newId,
-      subjectId: subjectId,
-      subjectName: subjectName,
-      subjectCode: subjectCode,
-      title: title,
-      description: description?.isEmpty == true ? null : description,
-      deadline: deadline,
-      attachmentUrl: attachmentUrl?.isEmpty == true ? null : attachmentUrl,
-      createdBy: 1,
-      createdAt: DateTime.now(),
-    );
-    state = state.copyWith(tasks: [...state.tasks, task]);
+    try {
+      await ApiClient.instance.post(
+        '/api/subjects/$subjectId/tasks',
+        data: {
+          'title': title,
+          if (description != null && description.isNotEmpty)
+            'description': description,
+          'deadline': deadline.toIso8601String(),
+          if (attachmentUrl != null && attachmentUrl.isNotEmpty)
+            'attachment_url': attachmentUrl,
+        },
+      );
+      // Refetch to get JOINed subject fields.
+      await fetchTasks(forceRefresh: true);
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+    }
   }
 
   Future<void> updateTask(
@@ -161,30 +101,32 @@ class TaskNotifier extends StateNotifier<TaskState> {
     DateTime? deadline,
     String? attachmentUrl,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    state = state.copyWith(
-      tasks: state.tasks.map((t) {
-        if (t.id != id) return t;
-        return t.copyWith(
-          subjectId: subjectId,
-          subjectName: subjectName,
-          subjectCode: subjectCode,
-          title: title,
-          description: description?.isEmpty == true ? null : description,
-          deadline: deadline,
-          attachmentUrl:
-              attachmentUrl?.isEmpty == true ? null : attachmentUrl,
-          updatedAt: DateTime.now(),
-        );
-      }).toList(),
-    );
+    try {
+      await ApiClient.instance.put(
+        '${ApiConstants.tasks}/$id',
+        data: {
+          'title': ?title,
+          'description': description,
+          if (deadline != null) 'deadline': deadline.toIso8601String(),
+          'attachment_url': attachmentUrl,
+        },
+      );
+      // Refetch to get updated JOINed data.
+      await fetchTasks(forceRefresh: true);
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+    }
   }
 
   Future<void> deleteTask(int id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    state = state.copyWith(
-      tasks: state.tasks.where((t) => t.id != id).toList(),
-    );
+    try {
+      await ApiClient.instance.delete('${ApiConstants.tasks}/$id');
+      state = state.copyWith(
+        tasks: state.tasks.where((t) => t.id != id).toList(),
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+    }
   }
 }
 

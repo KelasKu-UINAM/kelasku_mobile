@@ -1,138 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../models/schedule_model.dart';
-
-// ── Dummy data ────────────────────────────────────────────────
-// Sesuai Screen 11 design, hanya untuk class 1 (SI 4A)
-
-final _dummySchedules = [
-  // Senin
-  const ScheduleModel(
-    id: 5,
-    subjectId: 5,
-    subjectName: 'Bahasa Inggris II',
-    lecturer: 'Sarah Wilson, M.A',
-    subjectCode: 'BIG-201',
-    day: 'senin',
-    startTime: '10:00',
-    endTime: '11:30',
-    room: 'R. 101',
-    reminderMinutesBefore: 30,
-  ),
-  // Selasa
-  const ScheduleModel(
-    id: 1,
-    subjectId: 1,
-    subjectName: 'Analisis Real',
-    lecturer: 'Dr. Aisyah, M.Si',
-    subjectCode: 'MTK-401',
-    day: 'selasa',
-    startTime: '07:30',
-    endTime: '09:00',
-    room: 'R. 203',
-    reminderMinutesBefore: 30,
-  ),
-  const ScheduleModel(
-    id: 2,
-    subjectId: 2,
-    subjectName: 'Aljabar Linear',
-    lecturer: 'Prof. Hendra, M.T',
-    subjectCode: 'MTK-402',
-    day: 'selasa',
-    startTime: '09:15',
-    endTime: '10:45',
-    room: 'Aula B',
-    reminderMinutesBefore: 30,
-  ),
-  const ScheduleModel(
-    id: 3,
-    subjectId: 3,
-    subjectName: 'Statistika Matematika',
-    lecturer: 'Dr. Rahmat, M.Si',
-    subjectCode: 'MTK-403',
-    day: 'selasa',
-    startTime: '13:00',
-    endTime: '14:30',
-    room: 'R. 305',
-    reminderMinutesBefore: 15,
-  ),
-  const ScheduleModel(
-    id: 4,
-    subjectId: 4,
-    subjectName: 'Pemrograman Komputer',
-    lecturer: 'Dr. Budi Hartono',
-    subjectCode: 'MTK-404',
-    day: 'selasa',
-    startTime: '15:00',
-    endTime: '16:30',
-    room: 'Lab IT',
-    reminderMinutesBefore: 15,
-  ),
-  // Rabu
-  const ScheduleModel(
-    id: 10,
-    subjectId: 5,
-    subjectName: 'Bahasa Inggris II',
-    lecturer: 'Sarah Wilson, M.A',
-    subjectCode: 'BIG-201',
-    day: 'rabu',
-    startTime: '08:00',
-    endTime: '09:30',
-    room: 'R. 101',
-    reminderMinutesBefore: 30,
-  ),
-  // Kamis
-  const ScheduleModel(
-    id: 6,
-    subjectId: 1,
-    subjectName: 'Analisis Real',
-    lecturer: 'Dr. Aisyah, M.Si',
-    subjectCode: 'MTK-401',
-    day: 'kamis',
-    startTime: '08:00',
-    endTime: '09:30',
-    room: 'R. 203',
-    reminderMinutesBefore: 15,
-  ),
-  const ScheduleModel(
-    id: 7,
-    subjectId: 3,
-    subjectName: 'Statistika Matematika',
-    lecturer: 'Dr. Rahmat, M.Si',
-    subjectCode: 'MTK-403',
-    day: 'kamis',
-    startTime: '10:00',
-    endTime: '11:30',
-    room: 'R. 305',
-    reminderMinutesBefore: 15,
-  ),
-  // Jumat
-  const ScheduleModel(
-    id: 8,
-    subjectId: 4,
-    subjectName: 'Pemrograman Komputer',
-    lecturer: 'Dr. Budi Hartono',
-    subjectCode: 'MTK-404',
-    day: 'jumat',
-    startTime: '08:00',
-    endTime: '09:30',
-    room: 'Lab IT',
-    reminderMinutesBefore: 30,
-  ),
-  const ScheduleModel(
-    id: 9,
-    subjectId: 2,
-    subjectName: 'Aljabar Linear',
-    lecturer: 'Prof. Hendra, M.T',
-    subjectCode: 'MTK-402',
-    day: 'jumat',
-    startTime: '13:00',
-    endTime: '14:30',
-    room: 'Aula B',
-    reminderMinutesBefore: 30,
-  ),
-];
 
 // ── State ─────────────────────────────────────────────────────
 
@@ -171,11 +43,26 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   Future<void> fetchSchedules({bool forceRefresh = false}) async {
     if (!forceRefresh && state.schedules.isNotEmpty) return;
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    final schedules = _classId == 1
-        ? List<ScheduleModel>.from(_dummySchedules)
-        : <ScheduleModel>[];
-    state = state.copyWith(schedules: schedules, isLoading: false);
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.classes}/$_classId/schedules',
+      );
+      final data = extractData(response) as List<dynamic>;
+      final schedules = data
+          .map((e) => ScheduleModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      state = state.copyWith(schedules: schedules, isLoading: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+    }
   }
 
   Future<ScheduleModel?> createSchedule({
@@ -190,31 +77,34 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
     int reminderMinutesBefore = 15,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-
-    final newId = state.schedules.isEmpty
-        ? 100
-        : state.schedules.map((s) => s.id).reduce((a, b) => a > b ? a : b) + 1;
-
-    final newSchedule = ScheduleModel(
-      id: newId,
-      subjectId: subjectId,
-      subjectName: subjectName,
-      lecturer: lecturer,
-      subjectCode: subjectCode,
-      day: day,
-      startTime: startTime,
-      endTime: endTime,
-      room: room,
-      reminderMinutesBefore: reminderMinutesBefore,
-      createdAt: DateTime.now(),
-    );
-
-    state = state.copyWith(
-      schedules: [...state.schedules, newSchedule],
-      isLoading: false,
-    );
-    return newSchedule;
+    try {
+      await ApiClient.instance.post(
+        '/api/subjects/$subjectId/schedules',
+        data: {
+          'day': day,
+          'start_time': startTime,
+          'end_time': endTime,
+          if (room != null && room.isNotEmpty) 'room': room,
+          'reminder_minutes_before': reminderMinutesBefore,
+        },
+      );
+      // Refetch to get the full data including JOINed subject fields.
+      await fetchSchedules(forceRefresh: true);
+      // Return the most recently added schedule (last in the refreshed list).
+      return state.schedules.isNotEmpty ? state.schedules.last : null;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return null;
+    }
   }
 
   Future<bool> updateSchedule(
@@ -230,38 +120,60 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
     int reminderMinutesBefore = 15,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-
-    state = state.copyWith(
-      schedules: state.schedules.map((s) {
-        if (s.id != scheduleId) return s;
-        return s.copyWith(
-          subjectId: subjectId,
-          subjectName: subjectName,
-          lecturer: lecturer,
-          subjectCode: subjectCode,
-          day: day,
-          startTime: startTime,
-          endTime: endTime,
-          room: room,
-          reminderMinutesBefore: reminderMinutesBefore,
-          updatedAt: DateTime.now(),
-        );
-      }).toList(),
-      isLoading: false,
-    );
-    return true;
+    try {
+      await ApiClient.instance.put(
+        '${ApiConstants.schedules}/$scheduleId',
+        data: {
+          'day': day,
+          'start_time': startTime,
+          'end_time': endTime,
+          if (room != null && room.isNotEmpty) 'room': room,
+          'reminder_minutes_before': reminderMinutesBefore,
+        },
+      );
+      // Refetch to get updated JOINed data.
+      await fetchSchedules(forceRefresh: true);
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return false;
+    }
   }
 
   Future<bool> deleteSchedule(int scheduleId) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    state = state.copyWith(
-      schedules:
-          state.schedules.where((s) => s.id != scheduleId).toList(),
-      isLoading: false,
-    );
-    return true;
+    try {
+      await ApiClient.instance.delete(
+        '${ApiConstants.schedules}/$scheduleId',
+      );
+      state = state.copyWith(
+        schedules:
+            state.schedules.where((s) => s.id != scheduleId).toList(),
+        isLoading: false,
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return false;
+    }
   }
 
   void clearError() => state = state.copyWith(error: null);

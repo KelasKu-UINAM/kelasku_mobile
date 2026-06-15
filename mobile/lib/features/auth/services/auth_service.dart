@@ -1,3 +1,7 @@
+import 'package:dio/dio.dart';
+
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../models/user_model.dart';
 
 class AuthException implements Exception {
@@ -11,47 +15,34 @@ class AuthException implements Exception {
 }
 
 class AuthService {
-  static const _dummyAdminEmail = 'admin@kelasku-uinam.test';
-  static const _dummyBendaharaEmail = 'bendahara@kelasku-uinam.test';
-  static const _dummyMahasiswaEmail = 'mahasiswa@kelasku-uinam.test';
-  static const _dummyPassword = 'password123';
-
   Future<AuthResult> login({
     required String email,
     required String password,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    try {
+      final response = await ApiClient.instance.post(
+        '${ApiConstants.auth}/login',
+        data: {
+          'email': email,
+          'password': password,
+        },
+      );
 
-    if (password != _dummyPassword) {
-      throw const AuthException('Email atau password salah', statusCode: 401);
+      final data = extractData(response) as Map<String, dynamic>;
+      final result = AuthResult.fromJson(data);
+
+      // Persist token for subsequent authenticated requests.
+      await TokenStorage.instance.save(result.token);
+
+      return result;
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final message = extractErrorMessage(e);
+      throw AuthException(message, statusCode: statusCode);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw const AuthException('Terjadi kesalahan. Coba lagi.');
     }
-
-    final user = switch (email) {
-      _dummyAdminEmail => const User(
-          id: 1,
-          name: 'Admin Kelas',
-          email: _dummyAdminEmail,
-          phone: '6281111111111',
-        ),
-      _dummyBendaharaEmail => const User(
-          id: 2,
-          name: 'Bendahara Kelas',
-          email: _dummyBendaharaEmail,
-          phone: '6281222222222',
-        ),
-      _dummyMahasiswaEmail => const User(
-          id: 3,
-          name: 'Mahasiswa Kelas',
-          email: _dummyMahasiswaEmail,
-          phone: '6281333333333',
-        ),
-      _ => throw const AuthException('Email atau password salah', statusCode: 401),
-    };
-
-    return AuthResult(
-      token: 'dummy-jwt-${user.id}-${DateTime.now().millisecondsSinceEpoch}',
-      user: user,
-    );
   }
 
   Future<User> register({
@@ -60,27 +51,45 @@ class AuthService {
     required String password,
     String? phone,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    try {
+      final response = await ApiClient.instance.post(
+        '${ApiConstants.auth}/register',
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+          if (phone != null && phone.isNotEmpty) 'phone': phone,
+        },
+      );
 
-    const reservedEmails = {
-      _dummyAdminEmail,
-      _dummyBendaharaEmail,
-      _dummyMahasiswaEmail,
-    };
-    if (reservedEmails.contains(email.toLowerCase())) {
-      throw const AuthException('Email sudah terdaftar', statusCode: 409);
+      final data = extractData(response) as Map<String, dynamic>;
+      return User.fromJson(data);
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final message = extractErrorMessage(e);
+      throw AuthException(message, statusCode: statusCode);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw const AuthException('Terjadi kesalahan. Coba lagi.');
     }
+  }
 
-    // Backend treats phone as optional — send null when empty.
-    final normalizedPhone = (phone == null || phone.isEmpty) ? null : phone;
+  /// Fetches the current user profile using the stored token.
+  Future<User> getProfile() async {
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.auth}/profile',
+      );
 
-    return User(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      name: name,
-      email: email,
-      phone: normalizedPhone,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+      final data = extractData(response) as Map<String, dynamic>;
+      return User.fromJson(data);
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final message = extractErrorMessage(e);
+      throw AuthException(message, statusCode: statusCode);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw const AuthException('Terjadi kesalahan. Coba lagi.');
+    }
   }
 }

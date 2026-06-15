@@ -1,48 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../models/subject_model.dart';
-
-// ── Dummy data ────────────────────────────────────────────────
-// Sesuai Screen 14 design dan dummy class 1 (SI 4A)
-
-final _dummySubjects = [
-  const SubjectModel(
-    id: 1,
-    classId: 1,
-    name: 'Analisis Real',
-    code: 'MTK-401',
-    lecturer: 'Dr. Aisyah, M.Si',
-  ),
-  const SubjectModel(
-    id: 2,
-    classId: 1,
-    name: 'Aljabar Linear',
-    code: 'MTK-402',
-    lecturer: 'Prof. Hendra, M.T',
-  ),
-  const SubjectModel(
-    id: 3,
-    classId: 1,
-    name: 'Statistika Matematika',
-    code: 'MTK-403',
-    lecturer: 'Dr. Rahmat, M.Si',
-  ),
-  const SubjectModel(
-    id: 4,
-    classId: 1,
-    name: 'Pemrograman Komputer',
-    code: 'MTK-404',
-    lecturer: 'Dr. Budi Hartono',
-  ),
-  const SubjectModel(
-    id: 5,
-    classId: 1,
-    name: 'Bahasa Inggris II',
-    code: 'BIG-201',
-    lecturer: 'Sarah Wilson, M.A',
-  ),
-];
 
 // ── State ─────────────────────────────────────────────────────
 
@@ -81,10 +43,26 @@ class SubjectNotifier extends StateNotifier<SubjectState> {
   Future<void> fetchSubjects({bool forceRefresh = false}) async {
     if (!forceRefresh && state.subjects.isNotEmpty) return;
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    final subjects =
-        _dummySubjects.where((s) => s.classId == _classId).toList();
-    state = state.copyWith(subjects: subjects, isLoading: false);
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.classes}/$_classId/subjects',
+      );
+      final data = extractData(response) as List<dynamic>;
+      final subjects = data
+          .map((e) => SubjectModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      state = state.copyWith(subjects: subjects, isLoading: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+    }
   }
 
   Future<SubjectModel?> createSubject({
@@ -93,26 +71,35 @@ class SubjectNotifier extends StateNotifier<SubjectState> {
     String? code,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-
-    final newId = state.subjects.isEmpty
-        ? 100
-        : state.subjects.map((s) => s.id).reduce((a, b) => a > b ? a : b) + 1;
-
-    final newSubject = SubjectModel(
-      id: newId,
-      classId: _classId,
-      name: name,
-      lecturer: lecturer,
-      code: code,
-      createdAt: DateTime.now(),
-    );
-
-    state = state.copyWith(
-      subjects: [...state.subjects, newSubject],
-      isLoading: false,
-    );
-    return newSubject;
+    try {
+      final response = await ApiClient.instance.post(
+        '${ApiConstants.classes}/$_classId/subjects',
+        data: {
+          'name': name,
+          if (lecturer != null && lecturer.isNotEmpty) 'lecturer': lecturer,
+          if (code != null && code.isNotEmpty) 'code': code,
+        },
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      final newSubject = SubjectModel.fromJson(data);
+      state = state.copyWith(
+        subjects: [...state.subjects, newSubject],
+        isLoading: false,
+      );
+      return newSubject;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return null;
+    }
   }
 
   Future<bool> updateSubject(
@@ -122,31 +109,62 @@ class SubjectNotifier extends StateNotifier<SubjectState> {
     String? code,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-
-    state = state.copyWith(
-      subjects: state.subjects.map((s) {
-        if (s.id != subjectId) return s;
-        return s.copyWith(
-          name: name,
-          lecturer: lecturer,
-          code: code,
-          updatedAt: DateTime.now(),
-        );
-      }).toList(),
-      isLoading: false,
-    );
-    return true;
+    try {
+      final response = await ApiClient.instance.put(
+        '${ApiConstants.subjects}/$subjectId',
+        data: {
+          'name': name,
+          if (lecturer != null && lecturer.isNotEmpty) 'lecturer': lecturer,
+          if (code != null && code.isNotEmpty) 'code': code,
+        },
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      final updated = SubjectModel.fromJson(data);
+      state = state.copyWith(
+        subjects: state.subjects.map((s) {
+          if (s.id != subjectId) return s;
+          return updated;
+        }).toList(),
+        isLoading: false,
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return false;
+    }
   }
 
   Future<bool> deleteSubject(int subjectId) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    state = state.copyWith(
-      subjects: state.subjects.where((s) => s.id != subjectId).toList(),
-      isLoading: false,
-    );
-    return true;
+    try {
+      await ApiClient.instance.delete('${ApiConstants.subjects}/$subjectId');
+      state = state.copyWith(
+        subjects: state.subjects.where((s) => s.id != subjectId).toList(),
+        isLoading: false,
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return false;
+    }
   }
 
   void clearError() => state = state.copyWith(error: null);

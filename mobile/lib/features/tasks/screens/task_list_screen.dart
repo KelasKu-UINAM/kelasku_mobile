@@ -93,8 +93,8 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
           ? FloatingActionButton(
               heroTag: 'task_fab',
               onPressed: () async {
-                // createTask appends to state reactively; a forceRefresh here
-                // would re-seed the dummy data and wipe the new task.
+                // createTask refetches the list from API after creation;
+                // no manual refresh needed here.
                 await context.push<bool>(
                   '/tugas/tambah?classId=${activeClass.id}',
                 );

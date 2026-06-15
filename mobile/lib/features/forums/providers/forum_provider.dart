@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../models/forum_model.dart';
 import '../models/message_model.dart';
 
@@ -39,39 +42,28 @@ class ForumNotifier extends StateNotifier<ForumState> {
 
   Future<void> fetchForums({bool forceRefresh = false}) async {
     if (_loaded && !forceRefresh) return;
-    state = state.copyWith(isLoading: true);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-
-    if (_classId != 1) {
-      state = state.copyWith(forums: const [], isLoading: false);
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.classes}/$_classId/forums',
+      );
+      final data = extractData(response) as List<dynamic>;
+      final forums = data
+          .map((e) => ForumModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      state = state.copyWith(forums: forums, isLoading: false);
       _loaded = true;
-      return;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
     }
-
-    final base = DateTime.now().subtract(const Duration(days: 5));
-    final dummy = [
-      ForumModel(
-        id: 1,
-        classId: 1,
-        subjectId: null,
-        type: 'class',
-        name: 'Forum Kelas SI 4A',
-        subjectName: null,
-        createdAt: base,
-      ),
-      ForumModel(
-        id: 2,
-        classId: 1,
-        subjectId: 1,
-        type: 'subject',
-        name: 'Diskusi Pemrograman Mobile',
-        subjectName: 'Analisis Real',
-        createdAt: base.add(const Duration(days: 1)),
-      ),
-    ];
-
-    state = state.copyWith(forums: dummy, isLoading: false);
-    _loaded = true;
   }
 
   Future<void> createForum({
@@ -80,20 +72,21 @@ class ForumNotifier extends StateNotifier<ForumState> {
     int? subjectId,
     String? subjectName,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    final newId = state.forums.isEmpty
-        ? 1
-        : state.forums.map((f) => f.id).reduce((a, b) => a > b ? a : b) + 1;
-    final forum = ForumModel(
-      id: newId,
-      classId: _classId,
-      subjectId: type == 'subject' ? subjectId : null,
-      type: type,
-      name: name,
-      subjectName: type == 'subject' ? subjectName : null,
-      createdAt: DateTime.now(),
-    );
-    state = state.copyWith(forums: [...state.forums, forum]);
+    try {
+      await ApiClient.instance.post(
+        '${ApiConstants.classes}/$_classId/forums',
+        data: {
+          'type': type,
+          'name': name,
+          if (type == 'subject' && subjectId != null)
+            'subject_id': subjectId,
+        },
+      );
+      // Refetch to get subject_name from JOIN.
+      await fetchForums(forceRefresh: true);
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+    }
   }
 }
 
@@ -103,7 +96,8 @@ final forumProvider =
 );
 
 // Sorted oldest-first (mirrors backend ORDER BY created_at ASC).
-final forumListProvider = Provider.family<List<ForumModel>, int>((ref, classId) {
+final forumListProvider =
+    Provider.family<List<ForumModel>, int>((ref, classId) {
   final forums = ref.watch(forumProvider(classId)).forums;
   final sorted = [...forums]..sort(
       (a, b) =>
@@ -156,85 +150,34 @@ class MessageNotifier extends StateNotifier<MessageState> {
   final int _forumId;
   bool _loaded = false;
 
-  /// [silent] is used by the 5-second polling timer so the loading spinner
-  /// is not toggled on every refresh. Once loaded, dummy data is preserved
-  /// (so sent messages survive polling). In Phase 11 this re-fetches from API.
   Future<void> fetchMessages({bool silent = false}) async {
-    if (_loaded) {
-      // Polling no-op in dummy phase — real API will merge new messages here.
-      return;
+    if (_loaded && !silent) return;
+    if (!silent) state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.forums}/$_forumId/messages',
+      );
+      final data = extractData(response) as List<dynamic>;
+      final messages = data
+          .map((e) => MessageModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      state = state.copyWith(messages: messages, isLoading: false);
+      _loaded = true;
+    } on DioException catch (e) {
+      if (!silent) {
+        state = state.copyWith(
+          isLoading: false,
+          error: extractErrorMessage(e),
+        );
+      }
+    } catch (e) {
+      if (!silent) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Terjadi kesalahan. Coba lagi.',
+        );
+      }
     }
-    if (!silent) state = state.copyWith(isLoading: true);
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-
-    state = state.copyWith(messages: _dummyFor(_forumId), isLoading: false);
-    _loaded = true;
-  }
-
-  List<MessageModel> _dummyFor(int forumId) {
-    final now = DateTime.now();
-    DateTime ago(int minutes) => now.subtract(Duration(minutes: minutes));
-
-    if (forumId == 1) {
-      return [
-        MessageModel(
-          id: 1,
-          forumId: 1,
-          senderId: 1,
-          senderName: 'Admin Kelas',
-          message: 'Assalamualaikum, selamat datang di forum kelas SI 4A 🎉',
-          createdAt: ago(240),
-        ),
-        MessageModel(
-          id: 2,
-          forumId: 1,
-          senderId: 3,
-          senderName: 'Mahasiswa Kelas',
-          message: 'Waalaikumsalam kak, siap! 🙌',
-          createdAt: ago(232),
-        ),
-        MessageModel(
-          id: 3,
-          forumId: 1,
-          senderId: 2,
-          senderName: 'Bendahara Kelas',
-          message:
-              'Jangan lupa iuran minggu ini ya teman-teman, cek di menu Iuran 🙏',
-          createdAt: ago(120),
-        ),
-        MessageModel(
-          id: 4,
-          forumId: 1,
-          senderId: 1,
-          senderName: 'Admin Kelas',
-          message: 'Betul, mohon dilunasi sebelum akhir pekan.',
-          createdAt: ago(118),
-        ),
-      ];
-    }
-
-    if (forumId == 2) {
-      return [
-        MessageModel(
-          id: 1,
-          forumId: 2,
-          senderId: 1,
-          senderName: 'Admin Kelas',
-          message: 'Diskusi tugas Pemrograman Mobile kita taruh di sini ya.',
-          createdAt: ago(180),
-        ),
-        MessageModel(
-          id: 2,
-          forumId: 2,
-          senderId: 3,
-          senderName: 'Mahasiswa Kelas',
-          message: 'Kak, untuk state management sebaiknya pakai apa?',
-          createdAt: ago(60),
-        ),
-      ];
-    }
-
-    return const [];
   }
 
   Future<void> sendMessage({
@@ -245,20 +188,16 @@ class MessageNotifier extends StateNotifier<MessageState> {
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
 
-    final newId = state.messages.isEmpty
-        ? 1
-        : state.messages.map((m) => m.id).reduce((a, b) => a > b ? a : b) + 1;
-    final msg = MessageModel(
-      id: newId,
-      forumId: _forumId,
-      senderId: senderId,
-      senderName: senderName,
-      message: trimmed,
-      createdAt: DateTime.now(),
-    );
-    // Append (newest at bottom — chat order).
-    state = state.copyWith(messages: [...state.messages, msg]);
-    await Future<void>.delayed(const Duration(milliseconds: 150));
+    try {
+      await ApiClient.instance.post(
+        '${ApiConstants.forums}/$_forumId/messages',
+        data: {'message': trimmed},
+      );
+      // Refetch to get sender_name from JOIN.
+      await fetchMessages(silent: true);
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+    }
   }
 }
 

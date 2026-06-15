@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../models/whatsapp_config_model.dart';
 
 @immutable
@@ -41,22 +44,26 @@ class WhatsappConfigNotifier extends StateNotifier<WhatsappConfigState> {
 
   Future<void> fetchConfig({bool forceRefresh = false}) async {
     if (_loaded && !forceRefresh) return;
-    state = state.copyWith(isLoading: true);
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-
-    // class 1 has a seeded config; other classes start from default object.
-    final config = _classId == 1
-        ? const WhatsappConfigModel(
-            id: 1,
-            classId: 1,
-            adminPhone: '6281111111111',
-            treasurerPhone: '6281222222222',
-            notificationTemplate: kDefaultWhatsappTemplate,
-          )
-        : WhatsappConfigModel(classId: _classId);
-
-    state = state.copyWith(config: config, isLoading: false);
-    _loaded = true;
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.classes}/$_classId/whatsapp-config',
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      final config = WhatsappConfigModel.fromJson(data);
+      state = state.copyWith(config: config, isLoading: false);
+      _loaded = true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+    }
   }
 
   Future<void> saveConfig({
@@ -64,24 +71,35 @@ class WhatsappConfigNotifier extends StateNotifier<WhatsappConfigState> {
     String? treasurerPhone,
     required String notificationTemplate,
   }) async {
-    state = state.copyWith(isSaving: true);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
-    final current = state.config ?? WhatsappConfigModel(classId: _classId);
-    final updated = WhatsappConfigModel(
-      id: current.id ?? 1,
-      classId: _classId,
-      adminPhone: (adminPhone?.trim().isEmpty ?? true) ? null : adminPhone!.trim(),
-      treasurerPhone:
-          (treasurerPhone?.trim().isEmpty ?? true) ? null : treasurerPhone!.trim(),
-      notificationTemplate: notificationTemplate.trim().isEmpty
-          ? kDefaultWhatsappTemplate
-          : notificationTemplate.trim(),
-      createdAt: current.createdAt,
-      updatedAt: DateTime.now(),
-    );
-
-    state = state.copyWith(config: updated, isSaving: false);
+    state = state.copyWith(isSaving: true, error: null);
+    try {
+      final response = await ApiClient.instance.put(
+        '${ApiConstants.classes}/$_classId/whatsapp-config',
+        data: {
+          'admin_phone':
+              (adminPhone?.trim().isEmpty ?? true) ? null : adminPhone!.trim(),
+          'treasurer_phone': (treasurerPhone?.trim().isEmpty ?? true)
+              ? null
+              : treasurerPhone!.trim(),
+          'notification_template': notificationTemplate.trim().isEmpty
+              ? kDefaultWhatsappTemplate
+              : notificationTemplate.trim(),
+        },
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      final updated = WhatsappConfigModel.fromJson(data);
+      state = state.copyWith(config: updated, isSaving: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+    }
   }
 }
 

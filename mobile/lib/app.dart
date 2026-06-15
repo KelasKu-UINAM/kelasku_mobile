@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_text_styles.dart';
 import 'core/widgets/main_scaffold.dart';
+import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/classes/screens/class_detail_screen.dart';
@@ -33,16 +35,19 @@ import 'features/tasks/screens/task_detail_screen.dart';
 import 'features/tasks/screens/task_form_screen.dart';
 import 'features/tasks/screens/task_list_screen.dart';
 
-class KelaskuApp extends StatelessWidget {
+class KelaskuApp extends ConsumerWidget {
   const KelaskuApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAuth = ref.watch(isAuthenticatedProvider);
+    final router = _buildRouter(isAuth);
+
     return MaterialApp.router(
       title: 'KelasKu UINAM',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      routerConfig: _router,
+      routerConfig: router,
     );
   }
 
@@ -112,8 +117,17 @@ class KelaskuApp extends StatelessWidget {
   }
 }
 
-final GoRouter _router = GoRouter(
-  initialLocation: '/login',
+GoRouter _buildRouter(bool isAuth) => GoRouter(
+  initialLocation: isAuth ? '/home' : '/login',
+  redirect: (context, state) {
+    final isLoginRoute = state.matchedLocation == '/login';
+    final isRegisterRoute = state.matchedLocation == '/register';
+    final isAuthRoute = isLoginRoute || isRegisterRoute;
+
+    if (!isAuth && !isAuthRoute) return '/login';
+    if (isAuth && isAuthRoute) return '/home';
+    return null;
+  },
   routes: [
     // ── Auth (di luar shell) ────────────────────────────────────
     GoRoute(

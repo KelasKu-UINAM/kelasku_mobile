@@ -53,9 +53,8 @@ class _AnnouncementListScreenState
           ? FloatingActionButton(
               heroTag: 'announcement_fab',
               onPressed: () async {
-                // createAnnouncement prepends the new item to state, so the
-                // list updates reactively. A forceRefresh here would re-seed
-                // the dummy data and wipe the freshly created announcement.
+                // createAnnouncement refetches the list from API after creation;
+                // no manual refresh needed here.
                 await context.push<bool>(
                   '/pengumuman/tambah?classId=${widget.classId}',
                 );

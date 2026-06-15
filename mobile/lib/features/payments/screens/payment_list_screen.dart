@@ -51,8 +51,8 @@ class _PaymentListScreenState extends ConsumerState<PaymentListScreen> {
           ? FloatingActionButton(
               heroTag: 'payment_fab',
               onPressed: () async {
-                // createPayments appends to state reactively; a forceRefresh
-                // here would re-seed the dummy data and wipe the new bills.
+                // createPayments refetches the list from API after creation;
+                // no manual refresh needed here.
                 await context.push<bool>(
                   '/iuran/tambah?classId=${widget.classId}',
                 );

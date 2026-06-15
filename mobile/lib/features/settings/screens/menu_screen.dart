@@ -204,7 +204,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    ref.read(authProvider.notifier).logout();
+    await ref.read(authProvider.notifier).logout();
     if (context.mounted) context.go('/login');
   }
 }

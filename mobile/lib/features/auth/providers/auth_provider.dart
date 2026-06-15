@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/api_client.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
@@ -34,6 +35,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _service;
 
   AuthNotifier(this._service) : super(const AuthInitial());
+
+  /// Try to restore a previous session from stored token.
+  Future<bool> tryAutoLogin() async {
+    final token = await TokenStorage.instance.load();
+    if (token == null || token.isEmpty) return false;
+
+    state = const AuthLoading();
+    try {
+      final user = await _service.getProfile();
+      state = AuthAuthenticated(user: user, token: token);
+      return true;
+    } catch (_) {
+      // Token expired or invalid — clear and go to login.
+      await TokenStorage.instance.clear();
+      state = const AuthInitial();
+      return false;
+    }
+  }
 
   Future<bool> login({
     required String email,
@@ -78,7 +97,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await TokenStorage.instance.clear();
     state = const AuthInitial();
   }
 

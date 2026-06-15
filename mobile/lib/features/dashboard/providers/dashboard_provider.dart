@@ -1,5 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../classes/providers/class_provider.dart';
 import '../models/dashboard_model.dart';
@@ -19,87 +23,152 @@ String _initialsFromName(String? name) {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
+String _formatTimeRange(String? startTime, String? endTime) {
+  String normalize(String? t) {
+    if (t == null || t.isEmpty) return '';
+    final parts = t.split(':');
+    if (parts.length < 2) return t;
+    return '${parts[0].padLeft(2, '0')}.${parts[1].padLeft(2, '0')}';
+  }
+
+  return '${normalize(startTime)} – ${normalize(endTime)}';
+}
+
+String _daysLabel(DateTime deadline, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  final today = DateTime(current.year, current.month, current.day);
+  final dlDay = DateTime(deadline.year, deadline.month, deadline.day);
+  final diff = dlDay.difference(today).inDays;
+  if (diff < 0) return '${-diff} hari lewat';
+  if (diff == 0) return 'Hari ini';
+  return '$diff hari lagi';
+}
+
 final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   ref.keepAlive();
   final user = ref.watch(currentUserProvider);
-
-  // Read the user's classes reactively. DashboardScreen triggers fetchClasses
-  // (side effects belong in the widget) — a provider must NOT mutate
-  // classProvider here, as that throws during initialization.
   final classes = ref.watch(classListProvider);
   final firstClass = classes.isEmpty ? null : classes.first;
 
-  await Future<void>.delayed(const Duration(milliseconds: 350));
-
   final now = DateTime.now();
+  final greeting = _greeting(now);
+  final userName = user?.name ?? 'Mahasiswa';
+  final userInitials = _initialsFromName(user?.name);
 
-  return DashboardData(
-    greeting: _greeting(now),
-    userName: user?.name ?? 'Mahasiswa',
-    userInitials: _initialsFromName(user?.name),
-    userRoleInClass: firstClass?.roleInClass,
-    activeClass: firstClass == null
-        ? null
-        : ClassInfo(
-            id: firstClass.id,
-            name: firstClass.name,
-            faculty: firstClass.faculty,
-            department: firstClass.department,
-          ),
-    todaySchedules: const [
-      ScheduleItem(
-        id: 1,
-        subjectName: 'Pemrograman Mobile',
-        lecturer: 'Dr. Ahmad Rahman, M.Kom.',
-        timeLabel: '08.00 – 10.30',
-        room: 'Lab Komputer 1',
+  // If no active class, return a minimal dashboard.
+  if (firstClass == null) {
+    return DashboardData(
+      greeting: greeting,
+      userName: userName,
+      userInitials: userInitials,
+    );
+  }
+
+  try {
+    final response = await ApiClient.instance.get(
+      '${ApiConstants.classes}/${firstClass.id}/dashboard',
+    );
+    final data = extractData(response) as Map<String, dynamic>;
+
+    // Parse today's schedules.
+    final todaySchedulesRaw =
+        (data['today_schedules'] as List<dynamic>?) ?? [];
+    final todaySchedules = todaySchedulesRaw.map((e) {
+      final s = e as Map<String, dynamic>;
+      return ScheduleItem(
+        id: (s['id'] as num).toInt(),
+        subjectName: s['subject_name'] as String? ?? '',
+        lecturer: s['lecturer'] as String?,
+        timeLabel: _formatTimeRange(
+          s['start_time'] as String?,
+          s['end_time'] as String?,
+        ),
+        room: s['room'] as String? ?? '',
+      );
+    }).toList();
+
+    // Parse upcoming tasks.
+    final tasksRaw = (data['upcoming_tasks'] as List<dynamic>?) ?? [];
+    final upcomingTasks = tasksRaw.map((e) {
+      final t = e as Map<String, dynamic>;
+      final deadline = DateTime.parse(t['deadline'] as String);
+      final status = TaskDeadlineStatusX.fromDeadline(deadline, now: now);
+      return TaskItem(
+        id: (t['id'] as num).toInt(),
+        title: t['title'] as String? ?? '',
+        subjectName: t['subject_name'] as String? ?? '',
+        deadline: deadline,
+        daysLabel: _daysLabel(deadline, now: now),
+        status: status,
+      );
+    }).toList();
+
+    // Parse latest announcement.
+    final announcementsRaw =
+        (data['latest_announcements'] as List<dynamic>?) ?? [];
+    AnnouncementPreview? latestAnnouncement;
+    if (announcementsRaw.isNotEmpty) {
+      final a = announcementsRaw.first as Map<String, dynamic>;
+      final createdAt = a['created_at'] != null
+          ? DateTime.tryParse(a['created_at'].toString())
+          : null;
+      final dateLabel = createdAt != null
+          ? DateFormat('d MMM', 'id_ID').format(createdAt)
+          : '';
+      latestAnnouncement = AnnouncementPreview(
+        id: (a['id'] as num).toInt(),
+        title: a['title'] as String? ?? '',
+        excerpt: (a['content'] as String? ?? '').length > 100
+            ? '${(a['content'] as String).substring(0, 100)}...'
+            : (a['content'] as String? ?? ''),
+        category: a['subject_name'] as String?,
+        dateLabel: dateLabel,
+      );
+    }
+
+    // Parse payment summary.
+    IuranSummary? iuranSummary;
+    final paymentRaw = data['payment_summary'] as Map<String, dynamic>?;
+    if (paymentRaw != null) {
+      final totalMembers =
+          (paymentRaw['total_members'] as num?)?.toInt() ?? 0;
+      final totalPaid = (paymentRaw['total_paid'] as num?)?.toInt() ?? 0;
+      iuranSummary = IuranSummary(
+        paidCount: totalPaid,
+        totalMembers: totalMembers,
+        periodLabel: 'Minggu ini',
+      );
+    }
+
+    return DashboardData(
+      greeting: greeting,
+      userName: userName,
+      userInitials: userInitials,
+      userRoleInClass: firstClass.roleInClass,
+      activeClass: ClassInfo(
+        id: firstClass.id,
+        name: firstClass.name,
+        faculty: firstClass.faculty,
+        department: firstClass.department,
       ),
-      ScheduleItem(
-        id: 2,
-        subjectName: 'Basis Data Lanjut',
-        lecturer: 'Nur Aisyah, S.Kom., M.T.',
-        timeLabel: '10.30 – 12.00',
-        room: 'Ruang 203',
+      todaySchedules: todaySchedules,
+      upcomingTasks: upcomingTasks,
+      latestAnnouncement: latestAnnouncement,
+      iuranSummary: iuranSummary,
+    );
+  } on DioException {
+    // On API failure, return a minimal dashboard with class info.
+    return DashboardData(
+      greeting: greeting,
+      userName: userName,
+      userInitials: userInitials,
+      userRoleInClass: firstClass.roleInClass,
+      activeClass: ClassInfo(
+        id: firstClass.id,
+        name: firstClass.name,
+        faculty: firstClass.faculty,
+        department: firstClass.department,
       ),
-    ],
-    upcomingTasks: [
-      TaskItem(
-        id: 1,
-        title: 'Makalah Kalkulus',
-        subjectName: 'Kalkulus',
-        deadline: now.subtract(const Duration(days: 2)),
-        daysLabel: '2 hari lewat',
-        status: TaskDeadlineStatus.lewat,
-      ),
-      TaskItem(
-        id: 2,
-        title: 'Quiz Statistika',
-        subjectName: 'Statistika',
-        deadline: now.add(const Duration(days: 3)),
-        daysLabel: '3 hari lagi',
-        status: TaskDeadlineStatus.mendekat,
-      ),
-      TaskItem(
-        id: 3,
-        title: 'Laporan Praktikum',
-        subjectName: 'Fisika',
-        deadline: now.add(const Duration(days: 7)),
-        daysLabel: '7 hari lagi',
-        status: TaskDeadlineStatus.aman,
-      ),
-    ],
-    latestAnnouncement: const AnnouncementPreview(
-      id: 1,
-      title: 'Perubahan Jadwal UTS Semester Ini',
-      excerpt:
-          'Diberitahukan bahwa jadwal UTS untuk semester ini mengalami perubahan sesuai surat edaran dari Dekan Fakultas Sains dan Teknologi.',
-      category: 'Akademik',
-      dateLabel: '23 Mei',
-    ),
-    iuranSummary: const IuranSummary(
-      paidCount: 18,
-      totalMembers: 25,
-      periodLabel: 'Minggu ke-4 · Mei 2026',
-    ),
-  );
+    );
+  }
 });

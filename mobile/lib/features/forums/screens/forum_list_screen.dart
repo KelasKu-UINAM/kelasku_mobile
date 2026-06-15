@@ -70,8 +70,8 @@ class _ForumListScreenState extends ConsumerState<ForumListScreen> {
           ? FloatingActionButton(
               heroTag: 'forum_fab',
               onPressed: () async {
-                // createForum appends to state reactively; a forceRefresh here
-                // would re-seed the dummy data and wipe the new forum.
+                // createForum refetches the list from API after creation;
+                // no manual refresh needed here.
                 await context.push<bool>(
                   '/forum/buat?classId=$classId',
                 );

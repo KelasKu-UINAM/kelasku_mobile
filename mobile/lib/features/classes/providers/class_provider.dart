@@ -1,65 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_client.dart';
 import '../models/class_member_model.dart';
 import '../models/class_model.dart';
-
-// ── Dummy data ────────────────────────────────────────────────
-
-final _dummyClasses = [
-  const ClassModel(
-    id: 1,
-    name: 'Sistem Informasi 4A',
-    faculty: 'Sains dan Teknologi',
-    department: 'Sistem Informasi',
-    semester: 4,
-    academicYear: '2025/2026',
-    classCode: 'UINAM-SI4A01',
-    createdBy: 1,
-    roleInClass: 'admin_komting',
-  ),
-  const ClassModel(
-    id: 2,
-    name: 'Matematika Lanjut 3B',
-    faculty: 'Sains dan Teknologi',
-    department: 'Matematika',
-    semester: 3,
-    academicYear: '2025/2026',
-    classCode: 'UINAM-MTK3B2',
-    createdBy: 2,
-    roleInClass: 'mahasiswa',
-  ),
-];
-
-final _dummyMembers = [
-  const ClassMember(
-    id: 1,
-    classId: 1,
-    userId: 1,
-    name: 'Admin Kelas',
-    email: 'admin@kelasku-uinam.test',
-    phone: '6281111111111',
-    roleInClass: 'admin_komting',
-  ),
-  const ClassMember(
-    id: 2,
-    classId: 1,
-    userId: 2,
-    name: 'Bendahara Kelas',
-    email: 'bendahara@kelasku-uinam.test',
-    phone: '6281222222222',
-    roleInClass: 'bendahara',
-  ),
-  const ClassMember(
-    id: 3,
-    classId: 1,
-    userId: 3,
-    name: 'Mahasiswa Kelas',
-    email: 'mahasiswa@kelasku-uinam.test',
-    phone: '6281333333333',
-    roleInClass: 'mahasiswa',
-  ),
-];
 
 // ── State ─────────────────────────────────────────────────────
 
@@ -94,12 +40,26 @@ class ClassNotifier extends StateNotifier<ClassState> {
   ClassNotifier() : super(const ClassState());
 
   Future<void> fetchClasses({bool forceRefresh = false}) async {
-    // Jangan overwrite state yang sudah ada kelas (misal setelah join/create)
-    // kecuali diminta refresh eksplisit.
     if (!forceRefresh && state.classes.isNotEmpty) return;
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    state = state.copyWith(classes: _dummyClasses, isLoading: false);
+    try {
+      final response = await ApiClient.instance.get(ApiConstants.classes);
+      final data = extractData(response) as List<dynamic>;
+      final classes = data
+          .map((e) => ClassModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      state = state.copyWith(classes: classes, isLoading: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+    }
   }
 
   Future<ClassModel?> createClass({
@@ -110,94 +70,69 @@ class ClassNotifier extends StateNotifier<ClassState> {
     String? academicYear,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    try {
+      final response = await ApiClient.instance.post(
+        ApiConstants.classes,
+        data: {
+          'name': name,
+          if (faculty != null && faculty.isNotEmpty) 'faculty': faculty,
+          if (department != null && department.isNotEmpty)
+            'department': department,
+          'semester': ?semester,
+          if (academicYear != null && academicYear.isNotEmpty)
+            'academic_year': academicYear,
+        },
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      final newClass = ClassModel.fromJson(data);
 
-    final newId = state.classes.isEmpty
-        ? 1
-        : state.classes.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1;
-
-    final newClass = ClassModel(
-      id: newId,
-      name: name,
-      faculty: faculty,
-      department: department,
-      semester: semester,
-      academicYear: academicYear,
-      classCode: 'UINAM-KLS${newId.toString().padLeft(3, '0')}',
-      createdBy: 1,
-      roleInClass: 'admin_komting',
-      createdAt: DateTime.now(),
-    );
-
-    state = state.copyWith(
-      classes: [newClass, ...state.classes],
-      isLoading: false,
-    );
-    return newClass;
+      // The backend doesn't return role_in_class on create, so refetch.
+      await fetchClasses(forceRefresh: true);
+      return newClass;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return null;
+    }
   }
 
   Future<ClassModel?> joinClass(String classCode, {int? userId}) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    try {
+      final response = await ApiClient.instance.post(
+        '${ApiConstants.classes}/join',
+        data: {'class_code': classCode},
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      final joinedClass =
+          ClassModel.fromJson(data['class'] as Map<String, dynamic>);
 
-    final normalizedCode = classCode.trim().toUpperCase();
-
-    final alreadyJoined = state.classes.any(
-      (c) => c.classCode.toUpperCase() == normalizedCode,
-    );
-    if (alreadyJoined) {
-      state = state.copyWith(isLoading: false, error: 'Kamu sudah menjadi anggota kelas ini.');
+      // Refetch to get the full class list with role_in_class.
+      await fetchClasses(forceRefresh: true);
+      return joinedClass;
+    } on DioException catch (e) {
+      final message = extractErrorMessage(e);
+      state = state.copyWith(isLoading: false, error: message);
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
       return null;
     }
-
-    const joinableMeta = {
-      'UINAM-SI401A': (
-        name: 'Sistem Informasi 4A',
-        faculty: 'Sains dan Teknologi',
-        department: 'Sistem Informasi',
-        semester: 4,
-        academicYear: '2025/2026',
-      ),
-      'UINAM-DEMO01': (
-        name: 'Demo Kelas UINAM',
-        faculty: 'Sains dan Teknologi',
-        department: 'Teknik Informatika',
-        semester: 2,
-        academicYear: '2025/2026',
-      ),
-    };
-
-    final meta = joinableMeta[normalizedCode];
-    if (meta == null) {
-      state = state.copyWith(isLoading: false, error: 'Kode kelas tidak ditemukan.');
-      return null;
-    }
-
-    final newId = state.classes.isEmpty
-        ? 10
-        : state.classes.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1;
-
-    final joined = ClassModel(
-      id: newId,
-      name: meta.name,
-      faculty: meta.faculty,
-      department: meta.department,
-      semester: meta.semester,
-      academicYear: meta.academicYear,
-      classCode: normalizedCode,
-      createdBy: userId,
-      roleInClass: 'mahasiswa',
-      createdAt: DateTime.now(),
-    );
-
-    state = state.copyWith(
-      classes: [...state.classes, joined],
-      isLoading: false,
-    );
-    return joined;
   }
 
-  Future<bool> updateClass(int classId, {
+  Future<bool> updateClass(
+    int classId, {
     required String name,
     String? faculty,
     String? department,
@@ -205,33 +140,58 @@ class ClassNotifier extends StateNotifier<ClassState> {
     String? academicYear,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-
-    state = state.copyWith(
-      classes: state.classes.map((c) {
-        if (c.id != classId) return c;
-        return c.copyWith(
-          name: name,
-          faculty: faculty,
-          department: department,
-          semester: semester,
-          academicYear: academicYear,
-          updatedAt: DateTime.now(),
-        );
-      }).toList(),
-      isLoading: false,
-    );
-    return true;
+    try {
+      await ApiClient.instance.put(
+        '${ApiConstants.classes}/$classId',
+        data: {
+          'name': name,
+          if (faculty != null && faculty.isNotEmpty) 'faculty': faculty,
+          if (department != null && department.isNotEmpty)
+            'department': department,
+          'semester': ?semester,
+          if (academicYear != null && academicYear.isNotEmpty)
+            'academic_year': academicYear,
+        },
+      );
+      await fetchClasses(forceRefresh: true);
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return false;
+    }
   }
 
   Future<bool> deleteClass(int classId) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    state = state.copyWith(
-      classes: state.classes.where((c) => c.id != classId).toList(),
-      isLoading: false,
-    );
-    return true;
+    try {
+      await ApiClient.instance.delete('${ApiConstants.classes}/$classId');
+      state = state.copyWith(
+        classes: state.classes.where((c) => c.id != classId).toList(),
+        isLoading: false,
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return false;
+    }
   }
 
   void clearError() => state = state.copyWith(error: null);
@@ -257,30 +217,51 @@ final classByIdProvider = Provider.family<ClassModel?, int>((ref, id) {
 // ── Member notifier (per class) ───────────────────────────────
 
 class MemberNotifier extends StateNotifier<List<ClassMember>> {
-  MemberNotifier(int classId)
-      : super(_dummyMembers.where((m) => m.classId == classId).toList());
-
-  void updateMemberRole(int userId, String newRoleInClass) {
-    state = [
-      for (final m in state)
-        if (m.userId == userId)
-          ClassMember(
-            id: m.id,
-            classId: m.classId,
-            userId: m.userId,
-            name: m.name,
-            email: m.email,
-            phone: m.phone,
-            roleInClass: newRoleInClass,
-            joinedAt: m.joinedAt,
-          )
-        else
-          m,
-    ];
+  MemberNotifier(this._classId) : super([]) {
+    fetchMembers();
   }
 
-  void removeMember(int userId) {
-    state = state.where((m) => m.userId != userId).toList();
+  final int _classId;
+
+  Future<void> fetchMembers() async {
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.classes}/$_classId/members',
+      );
+      final data = extractData(response) as List<dynamic>;
+      state = data
+          .map((e) => ClassMember.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      // Silently fail — UI will show empty list.
+    }
+  }
+
+  Future<void> updateMemberRole(int userId, String newRoleInClass) async {
+    try {
+      await ApiClient.instance.post(
+        '${ApiConstants.classes}/$_classId/members',
+        data: {
+          'user_id': userId,
+          'role_in_class': newRoleInClass,
+        },
+      );
+      await fetchMembers();
+    } on DioException {
+      // Revert on failure is handled by refetch.
+    }
+  }
+
+  Future<void> removeMember(int userId) async {
+    try {
+      await ApiClient.instance.delete(
+        '${ApiConstants.classes}/$_classId/members/$userId',
+      );
+      state = state.where((m) => m.userId != userId).toList();
+    } on DioException {
+      // Refetch on failure.
+      await fetchMembers();
+    }
   }
 }
 
