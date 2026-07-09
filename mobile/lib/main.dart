@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
+import 'core/services/api_client.dart';
 import 'features/auth/providers/auth_provider.dart';
 
 Future<void> main() async {
@@ -20,6 +21,11 @@ Future<void> main() async {
 
   // Create a ProviderContainer so we can attempt auto-login before runApp.
   final container = ProviderContainer();
+
+  // Expired/invalid session (401 on any request) → back to login.
+  ApiClient.onUnauthorized = () {
+    container.read(authProvider.notifier).handleSessionExpired();
+  };
 
   // Try to restore a previous session from secure storage.
   await container.read(authProvider.notifier).tryAutoLogin();

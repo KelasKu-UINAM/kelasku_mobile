@@ -102,6 +102,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthInitial();
   }
 
+  /// Invoked by the global 401 interceptor: the token is already cleared,
+  /// so just drop the in-memory session. The router listens to auth state
+  /// and will redirect to /login.
+  void handleSessionExpired() {
+    if (state is AuthAuthenticated || state is AuthLoading) {
+      state = const AuthInitial();
+    }
+  }
+
   void clearError() {
     if (state is AuthFailure) {
       state = const AuthInitial();

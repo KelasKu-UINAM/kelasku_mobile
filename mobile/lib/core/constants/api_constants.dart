@@ -3,7 +3,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ApiConstants {
   ApiConstants._();
 
-  static final String baseUrl = dotenv.env['API_URL'] ?? 'http://10.0.2.2:3000';
+  static final String baseUrl = _resolveBaseUrl();
+
+  // `??` alone is not enough: a `.env` line like `API_URL=` yields an empty
+  // string (not null), which would silently produce an empty baseUrl.
+  static String _resolveBaseUrl() {
+    final url = dotenv.env['API_URL']?.trim();
+    if (url == null || url.isEmpty) return 'http://10.0.2.2:3000';
+    return url;
+  }
 
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);

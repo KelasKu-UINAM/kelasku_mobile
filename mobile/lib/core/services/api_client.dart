@@ -59,10 +59,33 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) {
+          _handleUnauthorized(error);
           handler.next(error);
         },
       ),
     );
+  }
+
+  /// Called when any authenticated request returns 401 (expired/invalid
+  /// token). Wired up in main.dart to reset auth state, which makes the
+  /// router redirect to /login.
+  static void Function()? onUnauthorized;
+
+  void _handleUnauthorized(DioException error) {
+    if (error.response?.statusCode != 401) return;
+
+    // A 401 from login/register means wrong credentials, not an expired
+    // session — let the caller show its own error message.
+    final path = error.requestOptions.path;
+    if (path.contains('/auth/login') || path.contains('/auth/register')) {
+      return;
+    }
+
+    // Only react when we actually had a session.
+    if (TokenStorage.instance.token == null) return;
+
+    TokenStorage.instance.clear();
+    onUnauthorized?.call();
   }
 
   static final ApiClient instance = ApiClient._();
