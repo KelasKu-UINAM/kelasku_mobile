@@ -118,6 +118,25 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
     }
   }
 
+  /// Asks the backend for a wa.me reminder link built from the class's
+  /// configured WhatsApp template. Returns null on failure (error set).
+  Future<String?> getReminderLink(int paymentId) async {
+    try {
+      final response = await ApiClient.instance.post(
+        '${ApiConstants.classes}/$_classId/send-payment-reminder',
+        data: {'payment_id': paymentId},
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      return data['whatsapp_link'] as String?;
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+      return null;
+    } catch (_) {
+      state = state.copyWith(error: 'Terjadi kesalahan. Coba lagi.');
+      return null;
+    }
+  }
+
   void clearError() => state = state.copyWith(error: null);
 }
 

@@ -403,7 +403,7 @@ class _PaymentRow extends ConsumerWidget {
                 if (payment.userPhone != null) ...[
                   const SizedBox(width: 6),
                   GestureDetector(
-                    onTap: () => _openWhatsApp(context, payment),
+                    onTap: () => _openWhatsApp(context, ref, payment),
                     child: const Icon(
                       Icons.chat_outlined,
                       size: 16,
@@ -453,20 +453,34 @@ class _PaymentRow extends ConsumerWidget {
     }
   }
 
-  Future<void> _openWhatsApp(BuildContext context, PaymentModel p) async {
-    final phone = p.userPhone!;
-    final week = p.paymentWeek;
-    final amount = p.formattedAmount;
-    final message = Uri.encodeComponent(
-      'Halo ${p.userName ?? ""}! Ini pengingat bahwa iuran kelas minggu ke-$week ($amount) belum dibayarkan. Mohon segera dilunasi. Terima kasih 🙏',
-    );
-    final url = Uri.parse('https://wa.me/$phone?text=$message');
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka WhatsApp')),
-        );
-      }
+  /// The wa.me link is built by the backend from the class's configured
+  /// notification template (whatsapp-config), not a hardcoded message.
+  Future<void> _openWhatsApp(
+    BuildContext context,
+    WidgetRef ref,
+    PaymentModel p,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final link = await ref
+        .read(paymentProvider(classId).notifier)
+        .getReminderLink(p.id);
+
+    if (link == null) {
+      final error = ref.read(paymentProvider(classId)).error;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal membuat pengingat WhatsApp.'),
+        ),
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(link);
+    if (uri == null ||
+        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Tidak dapat membuka WhatsApp')),
+      );
     }
   }
 }
