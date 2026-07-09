@@ -63,7 +63,9 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
     }
   }
 
-  Future<void> createPayments({
+  /// Returns true on success; on failure sets [PaymentState.error] and
+  /// returns false so callers can keep the form open.
+  Future<bool> createPayments({
     required int paymentWeek,
     required double amount,
     String? note,
@@ -87,12 +89,14 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       );
       // Refetch to get user JOINed fields.
       await fetchPayments(forceRefresh: true);
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
 
-  Future<void> markPaymentPaid(int id) async {
+  Future<bool> markPaymentPaid(int id) async {
     try {
       await ApiClient.instance.put(
         '/api/payments/$id/pay',
@@ -107,10 +111,14 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
           );
         }).toList(),
       );
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
+
+  void clearError() => state = state.copyWith(error: null);
 }
 
 final paymentProvider =

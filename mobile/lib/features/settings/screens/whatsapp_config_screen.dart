@@ -79,6 +79,15 @@ class _WhatsappConfigScreenState
         );
 
     if (!mounted) return;
+
+    final error = ref.read(whatsappConfigProvider(widget.classId)).error;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Konfigurasi WhatsApp tersimpan')),
     );

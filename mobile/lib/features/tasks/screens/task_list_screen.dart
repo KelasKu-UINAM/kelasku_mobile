@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/providers/class_provider.dart';
 import '../models/task_model.dart';
@@ -62,6 +63,18 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
     }
 
     if (classes.isEmpty) {
+      if (classState.error != null) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Tugas')),
+          body: ErrorStateWidget(
+            message: classState.error!,
+            onRetry: () => ref
+                .read(classProvider.notifier)
+                .fetchClasses(forceRefresh: true),
+          ),
+        );
+      }
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(title: const Text('Tugas')),
@@ -104,25 +117,33 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
           : null,
       body: taskState.isLoading && allTasks.isEmpty
           ? const LoadingWidget(message: 'Memuat tugas...')
-          : Column(
-              children: [
-                _FilterTabRow(
-                  activeTab: _activeTab,
-                  onSelect: (t) => setState(() => _activeTab = t),
+          : taskState.error != null && allTasks.isEmpty
+              ? ErrorStateWidget(
+                  message: taskState.error!,
+                  onRetry: () => ref
+                      .read(taskProvider(activeClass.id).notifier)
+                      .fetchTasks(forceRefresh: true),
+                )
+              : Column(
+                  children: [
+                    _FilterTabRow(
+                      activeTab: _activeTab,
+                      onSelect: (t) => setState(() => _activeTab = t),
+                    ),
+                    Expanded(
+                      child: allTasks.isEmpty
+                          ? _EmptyState(
+                              isAdmin: isAdmin, classId: activeClass.id)
+                          : filtered.isEmpty
+                              ? _EmptyFilter(tab: _activeTab)
+                              : _TaskList(
+                                  tasks: filtered,
+                                  isAdmin: isAdmin,
+                                  classId: activeClass.id,
+                                ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: allTasks.isEmpty
-                      ? _EmptyState(isAdmin: isAdmin, classId: activeClass.id)
-                      : filtered.isEmpty
-                          ? _EmptyFilter(tab: _activeTab)
-                          : _TaskList(
-                              tasks: filtered,
-                              isAdmin: isAdmin,
-                              classId: activeClass.id,
-                            ),
-                ),
-              ],
-            ),
     );
   }
 }

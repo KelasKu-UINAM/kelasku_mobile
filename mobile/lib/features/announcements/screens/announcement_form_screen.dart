@@ -96,8 +96,9 @@ class _AnnouncementFormScreenState
     final subjectName =
         _type == 'Per Mata Kuliah' ? _selectedSubject?.name : null;
 
+    final bool ok;
     if (widget.isEdit) {
-      await notifier.updateAnnouncement(
+      ok = await notifier.updateAnnouncement(
         widget.announcementId!,
         subjectId: subjectId,
         subjectName: subjectName,
@@ -105,7 +106,7 @@ class _AnnouncementFormScreenState
         content: _contentCtrl.text.trim(),
       );
     } else {
-      await notifier.createAnnouncement(
+      ok = await notifier.createAnnouncement(
         subjectId: subjectId,
         subjectName: subjectName,
         title: _titleCtrl.text.trim(),
@@ -115,6 +116,16 @@ class _AnnouncementFormScreenState
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(announcementProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menyimpan pengumuman. Coba lagi.'),
+        ),
+      );
+      return;
+    }
     context.pop(true);
   }
 
@@ -141,10 +152,21 @@ class _AnnouncementFormScreenState
     );
     if (confirmed != true || !mounted) return;
     setState(() => _isSubmitting = true);
-    await ref
+    final ok = await ref
         .read(announcementProvider(widget.classId).notifier)
         .deleteAnnouncement(widget.announcementId!);
     if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(announcementProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menghapus pengumuman. Coba lagi.'),
+        ),
+      );
+      return;
+    }
     context.pop(true);
   }
 

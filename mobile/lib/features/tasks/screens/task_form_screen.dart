@@ -117,8 +117,9 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
     setState(() => _isSubmitting = true);
     final notifier = ref.read(taskProvider(widget.classId).notifier);
 
+    final bool ok;
     if (widget.isEdit) {
-      await notifier.updateTask(
+      ok = await notifier.updateTask(
         widget.taskId!,
         subjectId: _selectedSubject!.id,
         subjectName: _selectedSubject!.name,
@@ -129,7 +130,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
         attachmentUrl: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
       );
     } else {
-      await notifier.createTask(
+      ok = await notifier.createTask(
         subjectId: _selectedSubject!.id,
         subjectName: _selectedSubject!.name,
         subjectCode: _selectedSubject!.code,
@@ -142,6 +143,14 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(taskProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Gagal menyimpan tugas. Coba lagi.')),
+      );
+      return;
+    }
     context.pop(true);
   }
 
@@ -168,10 +177,19 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
     );
     if (confirmed != true || !mounted) return;
     setState(() => _isSubmitting = true);
-    await ref
+    final ok = await ref
         .read(taskProvider(widget.classId).notifier)
         .deleteTask(widget.taskId!);
     if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(taskProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Gagal menghapus tugas. Coba lagi.')),
+      );
+      return;
+    }
     context.pop(true);
   }
 

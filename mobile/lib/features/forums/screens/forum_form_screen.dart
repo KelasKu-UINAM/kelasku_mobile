@@ -56,15 +56,24 @@ class _ForumFormScreenState extends ConsumerState<ForumFormScreen> {
     }
 
     setState(() => _isSubmitting = true);
-    await ref.read(forumProvider(widget.classId).notifier).createForum(
-          type: _isSubjectType ? 'subject' : 'class',
-          name: _nameCtrl.text.trim(),
-          subjectId: _isSubjectType ? _selectedSubject?.id : null,
-          subjectName: _isSubjectType ? _selectedSubject?.name : null,
-        );
+    final ok =
+        await ref.read(forumProvider(widget.classId).notifier).createForum(
+              type: _isSubjectType ? 'subject' : 'class',
+              name: _nameCtrl.text.trim(),
+              subjectId: _isSubjectType ? _selectedSubject?.id : null,
+              subjectName: _isSubjectType ? _selectedSubject?.name : null,
+            );
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(forumProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Gagal membuat forum. Coba lagi.')),
+      );
+      return;
+    }
     context.pop(true);
   }
 

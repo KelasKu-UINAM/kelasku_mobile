@@ -78,7 +78,7 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      await ApiClient.instance.post(
+      final response = await ApiClient.instance.post(
         '/api/subjects/$subjectId/schedules',
         data: {
           'day': day,
@@ -88,10 +88,17 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
           'reminder_minutes_before': reminderMinutesBefore,
         },
       );
-      // Refetch to get the full data including JOINed subject fields.
+      final created = extractData(response) as Map<String, dynamic>;
+      final createdId = (created['id'] as num).toInt();
+
+      // Refetch to get the full data including JOINed subject fields, then
+      // locate the new schedule by the id the API returned (the list is
+      // sorted by day/time, so "last" is not necessarily the new one).
       await fetchSchedules(forceRefresh: true);
-      // Return the most recently added schedule (last in the refreshed list).
-      return state.schedules.isNotEmpty ? state.schedules.last : null;
+      return state.schedules.cast<ScheduleModel?>().firstWhere(
+            (s) => s?.id == createdId,
+            orElse: () => null,
+          );
     } on DioException catch (e) {
       state = state.copyWith(
         isLoading: false,

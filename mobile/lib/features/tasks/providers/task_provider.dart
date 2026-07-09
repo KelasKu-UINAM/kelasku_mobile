@@ -63,7 +63,9 @@ class TaskNotifier extends StateNotifier<TaskState> {
     }
   }
 
-  Future<void> createTask({
+  /// Returns true on success; on failure sets [TaskState.error] and
+  /// returns false so callers can keep the form open.
+  Future<bool> createTask({
     required int subjectId,
     required String subjectName,
     String? subjectCode,
@@ -86,12 +88,14 @@ class TaskNotifier extends StateNotifier<TaskState> {
       );
       // Refetch to get JOINed subject fields.
       await fetchTasks(forceRefresh: true);
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
 
-  Future<void> updateTask(
+  Future<bool> updateTask(
     int id, {
     int? subjectId,
     String? subjectName,
@@ -113,21 +117,27 @@ class TaskNotifier extends StateNotifier<TaskState> {
       );
       // Refetch to get updated JOINed data.
       await fetchTasks(forceRefresh: true);
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
 
-  Future<void> deleteTask(int id) async {
+  Future<bool> deleteTask(int id) async {
     try {
       await ApiClient.instance.delete('${ApiConstants.tasks}/$id');
       state = state.copyWith(
         tasks: state.tasks.where((t) => t.id != id).toList(),
       );
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
+
+  void clearError() => state = state.copyWith(error: null);
 }
 
 final taskProvider =

@@ -55,14 +55,24 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     }
 
     setState(() => _isSubmitting = true);
-    await ref.read(paymentProvider(widget.classId).notifier).createPayments(
-          paymentWeek: week,
-          amount: amount,
-          note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-        );
+    final ok =
+        await ref.read(paymentProvider(widget.classId).notifier).createPayments(
+              paymentWeek: week,
+              amount: amount,
+              note:
+                  _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+            );
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(paymentProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Gagal membuat iuran. Coba lagi.')),
+      );
+      return;
+    }
     context.pop(true);
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/message_model.dart';
@@ -83,15 +84,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() => _isSending = true);
     _inputCtrl.clear();
 
-    await ref.read(messageProvider(widget.forumId).notifier).sendMessage(
-          senderId: user.id,
-          senderName: user.name,
-          message: text,
-        );
+    final ok =
+        await ref.read(messageProvider(widget.forumId).notifier).sendMessage(
+              senderId: user.id,
+              senderName: user.name,
+              message: text,
+            );
 
     if (!mounted) return;
     setState(() => _isSending = false);
     _scrollToBottom();
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Pesan gagal terkirim. Ketuk pesan untuk mencoba lagi.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _retryFailed(FailedMessage failed) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    final ok = await ref
+        .read(messageProvider(widget.forumId).notifier)
+        .retryFailedMessage(failed, senderId: user.id, senderName: user.name);
+
+    if (!mounted) return;
+    _scrollToBottom();
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Masih gagal terkirim. Coba lagi.')),
+      );
+    }
   }
 
   @override
@@ -139,28 +167,53 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(
             child: messageState.isLoading && messages.isEmpty
                 ? const LoadingWidget(message: 'Memuat pesan...')
-                : messages.isEmpty
-                    ? _EmptyChat()
-                    : ListView.builder(
-                        controller: _scrollCtrl,
-                        padding:
-                            const EdgeInsets.fromLTRB(14, 16, 14, 12),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = messages[index];
-                          final isMine = msg.senderId == currentUserId;
-                          final prev =
-                              index > 0 ? messages[index - 1] : null;
-                          final showName = !isMine &&
-                              (prev == null ||
-                                  prev.senderId != msg.senderId);
-                          return _MessageBubble(
-                            message: msg,
-                            isMine: isMine,
-                            showSenderName: showName,
-                          );
-                        },
-                      ),
+                : messageState.error != null &&
+                        messages.isEmpty &&
+                        messageState.failedMessages.isEmpty
+                    ? ErrorStateWidget(
+                        message: messageState.error!,
+                        onRetry: () => ref
+                            .read(messageProvider(widget.forumId).notifier)
+                            .fetchMessages(),
+                      )
+                    : messages.isEmpty &&
+                            messageState.failedMessages.isEmpty
+                        ? _EmptyChat()
+                        : ListView.builder(
+                            controller: _scrollCtrl,
+                            padding:
+                                const EdgeInsets.fromLTRB(14, 16, 14, 12),
+                            itemCount: messages.length +
+                                messageState.failedMessages.length,
+                            itemBuilder: (context, index) {
+                              // Failed (unsent) messages render after the
+                              // delivered ones, as retryable bubbles.
+                              if (index >= messages.length) {
+                                final failed = messageState
+                                    .failedMessages[index - messages.length];
+                                return _FailedMessageBubble(
+                                  failed: failed,
+                                  onRetry: () => _retryFailed(failed),
+                                  onDiscard: () => ref
+                                      .read(messageProvider(widget.forumId)
+                                          .notifier)
+                                      .discardFailedMessage(failed),
+                                );
+                              }
+                              final msg = messages[index];
+                              final isMine = msg.senderId == currentUserId;
+                              final prev =
+                                  index > 0 ? messages[index - 1] : null;
+                              final showName = !isMine &&
+                                  (prev == null ||
+                                      prev.senderId != msg.senderId);
+                              return _MessageBubble(
+                                message: msg,
+                                isMine: isMine,
+                                showSenderName: showName,
+                              );
+                            },
+                          ),
           ),
           _MessageInput(
             controller: _inputCtrl,
@@ -244,6 +297,84 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Failed message bubble (tap = retry, long-press = discard) ──
+
+class _FailedMessageBubble extends StatelessWidget {
+  final FailedMessage failed;
+  final VoidCallback onRetry;
+  final VoidCallback onDiscard;
+
+  const _FailedMessageBubble({
+    required this.failed,
+    required this.onRetry,
+    required this.onDiscard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          GestureDetector(
+            onTap: onRetry,
+            onLongPress: onDiscard,
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.74,
+              ),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 7),
+              decoration: BoxDecoration(
+                color: AppColors.statusRedBg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  topRight: Radius.circular(14),
+                  bottomLeft: Radius.circular(14),
+                  bottomRight: Radius.circular(4),
+                ),
+                border: Border.all(color: AppColors.statusRed, width: 0.6),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    failed.text,
+                    style: AppTextStyles.body.copyWith(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 12,
+                        color: AppColors.statusRed,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Gagal terkirim · ketuk untuk coba lagi',
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 9.5,
+                          color: AppColors.statusRed,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],

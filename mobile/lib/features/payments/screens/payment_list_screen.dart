@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../classes/providers/class_provider.dart';
@@ -60,12 +61,19 @@ class _PaymentListScreenState extends ConsumerState<PaymentListScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: isManager
-          ? _AdminView(classId: widget.classId)
-          : _MahasiswaView(
-              classId: widget.classId,
-              userId: currentUser?.id ?? 0,
-            ),
+      body: paymentState.error != null && paymentState.payments.isEmpty
+          ? ErrorStateWidget(
+              message: paymentState.error!,
+              onRetry: () => ref
+                  .read(paymentProvider(widget.classId).notifier)
+                  .fetchPayments(forceRefresh: true),
+            )
+          : isManager
+              ? _AdminView(classId: widget.classId)
+              : _MahasiswaView(
+                  classId: widget.classId,
+                  userId: currentUser?.id ?? 0,
+                ),
     );
   }
 }
@@ -431,9 +439,18 @@ class _PaymentRow extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    await ref
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await ref
         .read(paymentProvider(classId).notifier)
         .markPaymentPaid(payment.id);
+    if (!ok) {
+      final error = ref.read(paymentProvider(classId)).error;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menandai lunas. Coba lagi.'),
+        ),
+      );
+    }
   }
 
   Future<void> _openWhatsApp(BuildContext context, PaymentModel p) async {

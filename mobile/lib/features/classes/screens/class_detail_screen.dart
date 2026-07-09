@@ -7,8 +7,12 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/error_state_widget.dart';
+import '../../../core/widgets/loading_widget.dart';
 import '../../../core/widgets/role_badge.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../schedules/providers/schedule_provider.dart';
+import '../../subjects/providers/subject_provider.dart';
 import '../models/class_member_model.dart';
 import '../models/class_model.dart';
 import '../providers/class_provider.dart';
@@ -39,6 +43,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen>
       vsync: this,
       initialIndex: widget.initialTabIndex.clamp(0, 1),
     );
+    // Stat row shows real subject/schedule counts — make sure they load.
+    Future.microtask(() {
+      ref.read(subjectProvider(widget.classId).notifier).fetchSubjects();
+      ref.read(scheduleProvider(widget.classId).notifier).fetchSchedules();
+    });
   }
 
   @override
@@ -239,13 +248,15 @@ class _StatRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final memberCount = ref.watch(memberProvider(kelas.id)).length;
+    final memberCount = ref.watch(memberProvider(kelas.id)).members.length;
+    final subjectCount = ref.watch(subjectListProvider(kelas.id)).length;
+    final scheduleCount = ref.watch(scheduleListProvider(kelas.id)).length;
 
     return Row(
       children: [
-        _StatCard(count: '6', label: 'Mata Kuliah'),
+        _StatCard(count: '$subjectCount', label: 'Mata Kuliah'),
         const SizedBox(width: 8),
-        _StatCard(count: '12', label: 'Jadwal'),
+        _StatCard(count: '$scheduleCount', label: 'Jadwal'),
         const SizedBox(width: 8),
         _StatCard(count: '$memberCount', label: 'Anggota'),
       ],
@@ -457,8 +468,21 @@ class _AnggotaTab extends ConsumerWidget {
       );
     }
 
-    final members = ref.watch(memberProvider(classId));
+    final memberState = ref.watch(memberProvider(classId));
+    final members = memberState.members;
     final classCode = ref.watch(classByIdProvider(classId))?.classCode ?? '';
+
+    if (memberState.isLoading && members.isEmpty) {
+      return const LoadingWidget(message: 'Memuat anggota...');
+    }
+
+    if (memberState.error != null && members.isEmpty) {
+      return ErrorStateWidget(
+        message: memberState.error!,
+        onRetry: () =>
+            ref.read(memberProvider(classId).notifier).fetchMembers(),
+      );
+    }
 
     if (members.isEmpty) {
       return const EmptyStateWidget(
@@ -748,6 +772,7 @@ class _MemberRow extends ConsumerWidget {
     if (member.roleInClass != 'admin_komting') return false;
     final adminCount = ref
         .read(memberProvider(classId))
+        .members
         .where((m) => m.roleInClass == 'admin_komting')
         .length;
     return adminCount <= 1;
@@ -787,7 +812,7 @@ class _MemberRow extends ConsumerWidget {
               child: const Text('Batal'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 final isSelf =
                     member.userId == ref.read(currentUserProvider)?.id;
                 if (_isLastAdmin(ref) && selected != 'admin_komting') {
@@ -801,12 +826,18 @@ class _MemberRow extends ConsumerWidget {
                   );
                   return;
                 }
-                ref
+                Navigator.pop(dialogCtx);
+                final messenger = ScaffoldMessenger.of(context);
+                final ok = await ref
                     .read(memberProvider(classId).notifier)
                     .updateMemberRole(member.userId, selected);
-                Navigator.pop(dialogCtx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Role berhasil diubah')),
+                final error = ref.read(memberProvider(classId)).error;
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'Role berhasil diubah'
+                        : (error ?? 'Gagal mengubah role. Coba lagi.')),
+                  ),
                 );
               },
               child: const Text('Simpan'),
@@ -849,9 +880,17 @@ class _MemberRow extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    ref.read(memberProvider(classId).notifier).removeMember(member.userId);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Anggota dikeluarkan')),
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await ref
+        .read(memberProvider(classId).notifier)
+        .removeMember(member.userId);
+    final error = ref.read(memberProvider(classId)).error;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Anggota dikeluarkan'
+            : (error ?? 'Gagal mengeluarkan anggota. Coba lagi.')),
+      ),
     );
   }
 }

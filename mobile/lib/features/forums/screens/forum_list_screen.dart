@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/providers/class_provider.dart';
 import '../models/forum_model.dart';
@@ -39,6 +40,18 @@ class _ForumListScreenState extends ConsumerState<ForumListScreen> {
     }
 
     if (classes.isEmpty) {
+      if (classState.error != null) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Forum')),
+          body: ErrorStateWidget(
+            message: classState.error!,
+            onRetry: () => ref
+                .read(classProvider.notifier)
+                .fetchClasses(forceRefresh: true),
+          ),
+        );
+      }
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(title: const Text('Forum')),
@@ -81,9 +94,16 @@ class _ForumListScreenState extends ConsumerState<ForumListScreen> {
           : null,
       body: forumState.isLoading && forums.isEmpty
           ? const LoadingWidget(message: 'Memuat forum...')
-          : forums.isEmpty
-              ? _EmptyForums(classId: classId, canCreate: canCreate)
-              : _ForumList(forums: forums, classId: classId),
+          : forumState.error != null && forums.isEmpty
+              ? ErrorStateWidget(
+                  message: forumState.error!,
+                  onRetry: () => ref
+                      .read(forumProvider(classId).notifier)
+                      .fetchForums(forceRefresh: true),
+                )
+              : forums.isEmpty
+                  ? _EmptyForums(classId: classId, canCreate: canCreate)
+                  : _ForumList(forums: forums, classId: classId),
     );
   }
 }

@@ -64,8 +64,9 @@ class _SubjectFormScreenState extends ConsumerState<SubjectFormScreen> {
     setState(() => _isSubmitting = true);
     final notifier = ref.read(subjectProvider(widget.classId).notifier);
 
+    final bool ok;
     if (widget.isEdit) {
-      await notifier.updateSubject(
+      ok = await notifier.updateSubject(
         widget.subjectId!,
         name: _nameCtrl.text.trim(),
         lecturer: _lecturerCtrl.text.trim().isEmpty
@@ -74,17 +75,28 @@ class _SubjectFormScreenState extends ConsumerState<SubjectFormScreen> {
         code: _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
       );
     } else {
-      await notifier.createSubject(
+      final created = await notifier.createSubject(
         name: _nameCtrl.text.trim(),
         lecturer: _lecturerCtrl.text.trim().isEmpty
             ? null
             : _lecturerCtrl.text.trim(),
         code: _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
       );
+      ok = created != null;
     }
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(subjectProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menyimpan mata kuliah. Coba lagi.'),
+        ),
+      );
+      return;
+    }
     context.pop(true);
   }
 
@@ -113,10 +125,21 @@ class _SubjectFormScreenState extends ConsumerState<SubjectFormScreen> {
     );
     if (confirmed != true || !mounted) return;
     setState(() => _isSubmitting = true);
-    await ref
+    final ok = await ref
         .read(subjectProvider(widget.classId).notifier)
         .deleteSubject(widget.subjectId!);
     if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(subjectProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menghapus mata kuliah. Coba lagi.'),
+        ),
+      );
+      return;
+    }
     context.pop(true);
   }
 

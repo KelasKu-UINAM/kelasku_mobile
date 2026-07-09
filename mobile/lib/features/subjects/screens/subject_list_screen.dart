@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/models/class_model.dart';
 import '../../classes/providers/class_provider.dart';
@@ -58,7 +59,14 @@ class _SubjectListScreenState extends ConsumerState<SubjectListScreen> {
           : null,
       body: state.isLoading && subjects.isEmpty
           ? const LoadingWidget(message: 'Memuat mata kuliah...')
-          : subjects.isEmpty
+          : state.error != null && subjects.isEmpty
+              ? ErrorStateWidget(
+                  message: state.error!,
+                  onRetry: () => ref
+                      .read(subjectProvider(widget.classId).notifier)
+                      .fetchSubjects(forceRefresh: true),
+                )
+              : subjects.isEmpty
               ? EmptyStateWidget(
                   icon: Icons.menu_book_outlined,
                   title: 'Belum ada mata kuliah',

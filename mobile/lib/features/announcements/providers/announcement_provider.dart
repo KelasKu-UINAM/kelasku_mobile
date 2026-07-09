@@ -63,7 +63,9 @@ class AnnouncementNotifier extends StateNotifier<AnnouncementState> {
     }
   }
 
-  Future<void> createAnnouncement({
+  /// Returns true on success; on failure sets [AnnouncementState.error]
+  /// and returns false so callers can keep the form open.
+  Future<bool> createAnnouncement({
     required int? subjectId,
     required String? subjectName,
     required String title,
@@ -80,12 +82,14 @@ class AnnouncementNotifier extends StateNotifier<AnnouncementState> {
       );
       // Refetch to get creator_name and subject_name from JOINs.
       await fetchAnnouncements(forceRefresh: true);
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
 
-  Future<void> updateAnnouncement(
+  Future<bool> updateAnnouncement(
     int id, {
     required int? subjectId,
     required String? subjectName,
@@ -103,12 +107,14 @@ class AnnouncementNotifier extends StateNotifier<AnnouncementState> {
       );
       // Refetch to get updated JOINed data.
       await fetchAnnouncements(forceRefresh: true);
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
 
-  Future<void> deleteAnnouncement(int id) async {
+  Future<bool> deleteAnnouncement(int id) async {
     try {
       await ApiClient.instance.delete(
         '${ApiConstants.announcements}/$id',
@@ -117,10 +123,14 @@ class AnnouncementNotifier extends StateNotifier<AnnouncementState> {
         announcements:
             state.announcements.where((a) => a.id != id).toList(),
       );
+      return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
+
+  void clearError() => state = state.copyWith(error: null);
 }
 
 final announcementProvider = StateNotifierProvider.family<

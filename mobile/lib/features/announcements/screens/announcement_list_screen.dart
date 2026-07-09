@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/providers/class_provider.dart';
 import '../models/announcement_model.dart';
@@ -62,12 +63,19 @@ class _AnnouncementListScreenState
               child: const Icon(Icons.add),
             )
           : null,
-      body: announcements.isEmpty
-          ? _EmptyState(classId: widget.classId, canCreate: canCreate)
-          : _AnnouncementList(
-              announcements: announcements,
-              classId: widget.classId,
-            ),
+      body: announcementState.error != null && announcements.isEmpty
+          ? ErrorStateWidget(
+              message: announcementState.error!,
+              onRetry: () => ref
+                  .read(announcementProvider(widget.classId).notifier)
+                  .fetchAnnouncements(forceRefresh: true),
+            )
+          : announcements.isEmpty
+              ? _EmptyState(classId: widget.classId, canCreate: canCreate)
+              : _AnnouncementList(
+                  announcements: announcements,
+                  classId: widget.classId,
+                ),
     );
   }
 }

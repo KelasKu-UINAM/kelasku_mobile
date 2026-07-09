@@ -163,8 +163,19 @@ class TaskDetailScreen extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    await ref.read(taskProvider(classId).notifier).deleteTask(task.id);
-    if (context.mounted) context.pop();
+    final messenger = ScaffoldMessenger.of(context);
+    final ok =
+        await ref.read(taskProvider(classId).notifier).deleteTask(task.id);
+    if (!context.mounted) return;
+
+    if (!ok) {
+      final error = ref.read(taskProvider(classId)).error;
+      messenger.showSnackBar(
+        SnackBar(content: Text(error ?? 'Gagal menghapus tugas. Coba lagi.')),
+      );
+      return;
+    }
+    context.pop();
   }
 }
 

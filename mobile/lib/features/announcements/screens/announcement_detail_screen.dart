@@ -158,10 +158,22 @@ class AnnouncementDetailScreen extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    await ref
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await ref
         .read(announcementProvider(classId).notifier)
         .deleteAnnouncement(announcement.id);
-    if (context.mounted) context.pop();
+    if (!context.mounted) return;
+
+    if (!ok) {
+      final error = ref.read(announcementProvider(classId)).error;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menghapus pengumuman. Coba lagi.'),
+        ),
+      );
+      return;
+    }
+    context.pop();
   }
 }
 

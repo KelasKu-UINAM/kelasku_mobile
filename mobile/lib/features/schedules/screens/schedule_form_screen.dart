@@ -174,8 +174,9 @@ class _ScheduleFormScreenState extends ConsumerState<ScheduleFormScreen> {
     final notifier =
         ref.read(scheduleProvider(widget.classId).notifier);
 
+    final bool ok;
     if (widget.isEdit) {
-      await notifier.updateSchedule(
+      ok = await notifier.updateSchedule(
         widget.scheduleId!,
         subjectId: _selectedSubject!.id,
         subjectName: _selectedSubject!.name,
@@ -188,7 +189,7 @@ class _ScheduleFormScreenState extends ConsumerState<ScheduleFormScreen> {
         reminderMinutesBefore: _reminderMinutes,
       );
     } else {
-      await notifier.createSchedule(
+      final created = await notifier.createSchedule(
         subjectId: _selectedSubject!.id,
         subjectName: _selectedSubject!.name,
         lecturer: _selectedSubject!.lecturer,
@@ -199,10 +200,21 @@ class _ScheduleFormScreenState extends ConsumerState<ScheduleFormScreen> {
         room: _roomCtrl.text.trim().isEmpty ? null : _roomCtrl.text.trim(),
         reminderMinutesBefore: _reminderMinutes,
       );
+      ok = created != null;
     }
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(scheduleProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menyimpan jadwal. Coba lagi.'),
+        ),
+      );
+      return;
+    }
     context.pop(true);
   }
 
@@ -229,10 +241,21 @@ class _ScheduleFormScreenState extends ConsumerState<ScheduleFormScreen> {
     );
     if (confirmed != true || !mounted) return;
     setState(() => _isSubmitting = true);
-    await ref
+    final ok = await ref
         .read(scheduleProvider(widget.classId).notifier)
         .deleteSchedule(widget.scheduleId!);
     if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (!ok) {
+      final error = ref.read(scheduleProvider(widget.classId)).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal menghapus jadwal. Coba lagi.'),
+        ),
+      );
+      return;
+    }
     context.pop(true);
   }
 

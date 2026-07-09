@@ -216,28 +216,65 @@ final classByIdProvider = Provider.family<ClassModel?, int>((ref, id) {
 
 // ── Member notifier (per class) ───────────────────────────────
 
-class MemberNotifier extends StateNotifier<List<ClassMember>> {
-  MemberNotifier(this._classId) : super([]) {
+@immutable
+class MemberState {
+  final List<ClassMember> members;
+  final bool isLoading;
+  final String? error;
+
+  const MemberState({
+    this.members = const [],
+    this.isLoading = false,
+    this.error,
+  });
+
+  MemberState copyWith({
+    List<ClassMember>? members,
+    bool? isLoading,
+    String? error,
+  }) {
+    return MemberState(
+      members: members ?? this.members,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+class MemberNotifier extends StateNotifier<MemberState> {
+  MemberNotifier(this._classId) : super(const MemberState()) {
     fetchMembers();
   }
 
   final int _classId;
 
   Future<void> fetchMembers() async {
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await ApiClient.instance.get(
         '${ApiConstants.classes}/$_classId/members',
       );
       final data = extractData(response) as List<dynamic>;
-      state = data
-          .map((e) => ClassMember.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } on DioException {
-      // Silently fail — UI will show empty list.
+      state = state.copyWith(
+        members: data
+            .map((e) => ClassMember.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        isLoading: false,
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractErrorMessage(e),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
     }
   }
 
-  Future<void> updateMemberRole(int userId, String newRoleInClass) async {
+  Future<bool> updateMemberRole(int userId, String newRoleInClass) async {
     try {
       await ApiClient.instance.post(
         '${ApiConstants.classes}/$_classId/members',
@@ -247,25 +284,32 @@ class MemberNotifier extends StateNotifier<List<ClassMember>> {
         },
       );
       await fetchMembers();
-    } on DioException {
-      // Revert on failure is handled by refetch.
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+      return false;
     }
   }
 
-  Future<void> removeMember(int userId) async {
+  Future<bool> removeMember(int userId) async {
     try {
       await ApiClient.instance.delete(
         '${ApiConstants.classes}/$_classId/members/$userId',
       );
-      state = state.where((m) => m.userId != userId).toList();
-    } on DioException {
-      // Refetch on failure.
+      state = state.copyWith(
+        members: state.members.where((m) => m.userId != userId).toList(),
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+      // Re-sync with the server since the local list may be stale.
       await fetchMembers();
+      return false;
     }
   }
 }
 
 final memberProvider =
-    StateNotifierProvider.family<MemberNotifier, List<ClassMember>, int>(
+    StateNotifierProvider.family<MemberNotifier, MemberState, int>(
   (ref, classId) => MemberNotifier(classId),
 );

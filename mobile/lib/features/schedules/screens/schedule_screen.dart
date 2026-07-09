@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/providers/class_provider.dart';
 import '../models/schedule_model.dart';
@@ -92,6 +93,18 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
     }
 
     if (classes.isEmpty) {
+      if (classState.error != null) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Jadwal Kuliah')),
+          body: ErrorStateWidget(
+            message: classState.error!,
+            onRetry: () => ref
+                .read(classProvider.notifier)
+                .fetchClasses(forceRefresh: true),
+          ),
+        );
+      }
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(title: const Text('Jadwal Kuliah')),
@@ -163,18 +176,25 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
       ),
       body: scheduleState.isLoading
           ? const LoadingWidget(message: 'Memuat jadwal...')
-          : TabBarView(
-              controller: _tabController,
-              children: _dayKeys
-                  .map(
-                    (day) => _DayScheduleList(
-                      classId: activeClass.id,
-                      day: day,
-                      isAdmin: isAdmin,
-                    ),
-                  )
-                  .toList(),
-            ),
+          : scheduleState.error != null && scheduleState.schedules.isEmpty
+              ? ErrorStateWidget(
+                  message: scheduleState.error!,
+                  onRetry: () => ref
+                      .read(scheduleProvider(activeClass.id).notifier)
+                      .fetchSchedules(forceRefresh: true),
+                )
+              : TabBarView(
+                  controller: _tabController,
+                  children: _dayKeys
+                      .map(
+                        (day) => _DayScheduleList(
+                          classId: activeClass.id,
+                          day: day,
+                          isAdmin: isAdmin,
+                        ),
+                      )
+                      .toList(),
+                ),
     );
   }
 }

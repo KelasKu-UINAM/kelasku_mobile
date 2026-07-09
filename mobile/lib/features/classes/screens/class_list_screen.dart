@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../../core/widgets/role_badge.dart';
 import '../models/class_model.dart';
@@ -37,9 +38,16 @@ class _ClassListScreenState extends ConsumerState<ClassListScreen> {
       ),
       body: state.isLoading
           ? const LoadingWidget(message: 'Memuat daftar kelas...')
-          : state.classes.isEmpty
-              ? _buildEmpty(context)
-              : _buildList(context, state.classes),
+          : state.error != null && state.classes.isEmpty
+              ? ErrorStateWidget(
+                  message: state.error!,
+                  onRetry: () => ref
+                      .read(classProvider.notifier)
+                      .fetchClasses(forceRefresh: true),
+                )
+              : state.classes.isEmpty
+                  ? _buildEmpty(context)
+                  : _buildList(context, state.classes),
     );
   }
 
