@@ -1,7 +1,12 @@
+# NOTE: `name` is the Dart package name (snake_case) — the launcher display
+# name "Kelasku UINAM" lives in AndroidManifest.xml / Info.plist.
 name: mobile
-description: "KelasKu UINAM - aplikasi manajemen kelas mahasiswa UIN Alauddin Makassar."
+description: "Kelasku UINAM — aplikasi manajemen kelas kuliah untuk mahasiswa UIN Alauddin Makassar: jadwal, tugas, pengumuman, forum diskusi, dan iuran kelas dalam satu aplikasi."
 publish_to: 'none'
-version: 1.1.0+2
+# 1.2.0+3: first Play Store release candidate. versionCode bumped above the
+# previous 1.1.0+2 in case that build was already uploaded to Play Console
+# (never lower a versionCode). Verify against Play Console before upload.
+version: 1.2.0+3
 
 environment:
   sdk: ^3.12.0
