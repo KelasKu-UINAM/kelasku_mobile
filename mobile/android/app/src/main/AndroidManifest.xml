@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required here (main manifest): the debug/profile manifests declare
+         INTERNET for dev tooling only — without this, release builds ship
+         with no network access at all. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Kelasku UINAM"
         android:name="${applicationName}"
