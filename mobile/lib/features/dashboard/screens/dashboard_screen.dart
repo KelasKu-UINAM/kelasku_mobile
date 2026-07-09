@@ -64,7 +64,8 @@ class _DashboardBody extends StatelessWidget {
           name: data.userName,
           initials: data.userInitials,
         ),
-        if (data.activeClass != null) _ActiveClassRow(activeClass: data.activeClass!),
+        if (data.activeClass != null)
+          _ActiveClassRow(activeClass: data.activeClass!),
         Expanded(
           child: RefreshIndicator(
             color: AppColors.primary,
@@ -164,7 +165,10 @@ class _Avatar extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accent,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 2),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 2,
+        ),
       ),
       alignment: Alignment.center,
       child: Text(
@@ -239,8 +243,11 @@ class _ActiveClassRow extends ConsumerWidget {
                   ),
                 )
               else
-                const Icon(Icons.chevron_right,
-                    size: 18, color: AppColors.textMuted),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.textMuted,
+                ),
             ],
           ),
         ),
@@ -275,9 +282,7 @@ class _ActiveClassRow extends ConsumerWidget {
                 ),
                 title: Text(kelas.name),
                 onTap: () {
-                  ref
-                      .read(activeClassIdProvider.notifier)
-                      .select(kelas.id);
+                  ref.read(activeClassIdProvider.notifier).select(kelas.id);
                   Navigator.pop(sheetCtx);
                 },
               ),
@@ -301,12 +306,22 @@ class _ShortcutGrid extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(14),
-        border: const Border.fromBorderSide(BorderSide(color: AppColors.border)),
+        border: const Border.fromBorderSide(
+          BorderSide(color: AppColors.border),
+        ),
       ),
       child: Row(
         children: [
-          _ShortcutItem(label: 'Jadwal', icon: Icons.calendar_today_outlined, onTap: () => context.go('/jadwal')),
-          _ShortcutItem(label: 'Tugas', icon: Icons.assignment_outlined, onTap: () => context.go('/tugas')),
+          _ShortcutItem(
+            label: 'Jadwal',
+            icon: Icons.calendar_today_outlined,
+            onTap: () => context.go('/jadwal'),
+          ),
+          _ShortcutItem(
+            label: 'Tugas',
+            icon: Icons.assignment_outlined,
+            onTap: () => context.go('/tugas'),
+          ),
           _ShortcutItem(
             label: 'Iuran',
             icon: Icons.account_balance_wallet_outlined,
@@ -314,7 +329,11 @@ class _ShortcutGrid extends StatelessWidget {
                 ? context.push('/iuran?classId=$activeClassId')
                 : context.push('/kelas'),
           ),
-          _ShortcutItem(label: 'Forum', icon: Icons.chat_bubble_outline, onTap: () => context.go('/forum')),
+          _ShortcutItem(
+            label: 'Forum',
+            icon: Icons.chat_bubble_outline,
+            onTap: () => context.go('/forum'),
+          ),
         ],
       ),
     );
@@ -375,11 +394,7 @@ class _SectionHeader extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
 
-  const _SectionHeader({
-    required this.title,
-    this.actionLabel,
-    this.onAction,
-  });
+  const _SectionHeader({required this.title, this.actionLabel, this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -433,7 +448,10 @@ class _ScheduleSection extends StatelessWidget {
           onAction: () => context.go('/jadwal'),
         ),
         if (items.isEmpty)
-          _EmptyHint(icon: Icons.event_busy_outlined, label: 'Tidak ada jadwal hari ini.')
+          _EmptyHint(
+            icon: Icons.event_busy_outlined,
+            label: 'Tidak ada jadwal hari ini.',
+          )
         else
           Row(
             children: [
@@ -460,7 +478,9 @@ class _ScheduleCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        border: const Border.fromBorderSide(BorderSide(color: AppColors.divider)),
+        border: const Border.fromBorderSide(
+          BorderSide(color: AppColors.divider),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -534,12 +554,17 @@ class _TaskSection extends StatelessWidget {
           onAction: () => context.go('/tugas'),
         ),
         if (items.isEmpty)
-          _EmptyHint(icon: Icons.check_circle_outline, label: 'Belum ada tugas mendekat.')
+          _EmptyHint(
+            icon: Icons.check_circle_outline,
+            label: 'Belum ada tugas mendekat.',
+          )
         else
-          ...items.map((task) => Padding(
-                padding: const EdgeInsets.only(bottom: 7),
-                child: _TaskRow(task: task),
-              )),
+          ...items.map(
+            (task) => Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: _TaskRow(task: task),
+            ),
+          ),
       ],
     );
   }
@@ -579,7 +604,9 @@ class _TaskRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(10),
-        border: const Border.fromBorderSide(BorderSide(color: AppColors.divider)),
+        border: const Border.fromBorderSide(
+          BorderSide(color: AppColors.divider),
+        ),
       ),
       child: Row(
         children: [
@@ -639,7 +666,9 @@ class _AnnouncementSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.card,
             borderRadius: BorderRadius.circular(12),
-            border: const Border.fromBorderSide(BorderSide(color: AppColors.divider)),
+            border: const Border.fromBorderSide(
+              BorderSide(color: AppColors.divider),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -688,7 +717,10 @@ class _AnnouncementSection extends StatelessWidget {
               if (item.category != null) ...[
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.09),
                     borderRadius: BorderRadius.circular(6),
@@ -719,22 +751,36 @@ class _IuranSummarySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void openIuran() {
+      classId != null
+          ? context.push('/iuran?classId=$classId')
+          : context.push('/kelas');
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionHeader(title: 'Ringkasan Iuran'),
-        Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 15),
-          decoration: BoxDecoration(
-            color: AppColors.card,
+        _SectionHeader(
+          title: 'Ringkasan Iuran',
+          actionLabel: 'Lihat detail',
+          onAction: openIuran,
+        ),
+        Material(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: openIuran,
             borderRadius: BorderRadius.circular(12),
-            border: const Border.fromBorderSide(BorderSide(color: AppColors.divider)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 15),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: const Border.fromBorderSide(
+                  BorderSide(color: AppColors.divider),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
                     summary.periodLabel,
@@ -745,59 +791,45 @@ class _IuranSummarySection extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  InkWell(
-                    onTap: () => classId != null
-                        ? context.push('/iuran?classId=$classId')
-                        : context.push('/kelas'),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Text(
-                        'Lihat detail',
-                        style: AppTextStyles.link.copyWith(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(height: 6),
+                  RichText(
+                    text: TextSpan(
+                      style: AppTextStyles.body.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.1,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: '${summary.paidCount}',
+                          style: AppTextStyles.body.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
                         ),
+                        TextSpan(
+                          text: ' dari ${summary.totalBills} tagihan lunas',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 11),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: summary.progress.clamp(0.0, 1.0),
+                      minHeight: 6,
+                      backgroundColor: const Color(0xFFE8F2EB),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              RichText(
-                text: TextSpan(
-                  style: AppTextStyles.body.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.1,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: '${summary.paidCount}',
-                      style: AppTextStyles.body.copyWith(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    TextSpan(
-                      text: ' dari ${summary.totalBills} tagihan lunas',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 11),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: summary.progress.clamp(0.0, 1.0),
-                  minHeight: 6,
-                  backgroundColor: const Color(0xFFE8F2EB),
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],
@@ -818,7 +850,9 @@ class _EmptyHint extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        border: const Border.fromBorderSide(BorderSide(color: AppColors.divider)),
+        border: const Border.fromBorderSide(
+          BorderSide(color: AppColors.divider),
+        ),
       ),
       child: Row(
         children: [
@@ -827,7 +861,9 @@ class _EmptyHint extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textMuted,
+              ),
             ),
           ),
         ],
@@ -850,9 +886,17 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 40, color: AppColors.statusRed),
+            const Icon(
+              Icons.error_outline,
+              size: 40,
+              color: AppColors.statusRed,
+            ),
             const SizedBox(height: 12),
-            Text(message, style: AppTextStyles.body, textAlign: TextAlign.center),
+            Text(
+              message,
+              style: AppTextStyles.body,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             TextButton.icon(
               onPressed: onRetry,

@@ -37,13 +37,17 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
   final int _classId;
   bool _loaded = false;
 
-  Future<void> fetchPayments({bool forceRefresh = false}) async {
+  Future<void> fetchPayments({
+    bool forceRefresh = false,
+    bool mineOnly = false,
+  }) async {
     if (_loaded && !forceRefresh) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiClient.instance.get(
-        '${ApiConstants.classes}/$_classId/payments',
-      );
+      final path = mineOnly
+          ? '${ApiConstants.classes}/$_classId/payments/me'
+          : '${ApiConstants.classes}/$_classId/payments';
+      final response = await ApiClient.instance.get(path);
       final data = extractData(response) as List<dynamic>;
       final payments = data
           .map((e) => PaymentModel.fromJson(e as Map<String, dynamic>))
@@ -51,11 +55,8 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       state = state.copyWith(payments: payments, isLoading: false);
       _loaded = true;
     } on DioException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: extractErrorMessage(e),
-      );
-    } catch (e) {
+      state = state.copyWith(isLoading: false, error: extractErrorMessage(e));
+    } catch (_) {
       state = state.copyWith(
         isLoading: false,
         error: 'Terjadi kesalahan. Coba lagi.',
@@ -80,27 +81,27 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         },
       );
       final data = extractData(response) as Map<String, dynamic>;
-      final newPayments = (data['payments'] as List<dynamic>?)
+      final newPayments =
+          (data['payments'] as List<dynamic>?)
               ?.map((e) => PaymentModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [];
-      state = state.copyWith(
-        payments: [...state.payments, ...newPayments],
-      );
+      state = state.copyWith(payments: [...state.payments, ...newPayments]);
       // Refetch to get user JOINed fields.
       await fetchPayments(forceRefresh: true);
       return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
       return false;
+    } catch (_) {
+      state = state.copyWith(error: 'Terjadi kesalahan. Coba lagi.');
+      return false;
     }
   }
 
   Future<bool> markPaymentPaid(int id) async {
     try {
-      await ApiClient.instance.put(
-        '/api/payments/$id/pay',
-      );
+      await ApiClient.instance.put('/api/payments/$id/pay');
       state = state.copyWith(
         payments: state.payments.map((p) {
           if (p.id != id) return p;
@@ -114,6 +115,54 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       return true;
     } on DioException catch (e) {
       state = state.copyWith(error: extractErrorMessage(e));
+      return false;
+    }
+  }
+
+  Future<void> refreshPayments({bool mineOnly = false}) async {
+    await fetchPayments(forceRefresh: true, mineOnly: mineOnly);
+  }
+
+  Future<PaymentQrisModel?> createPaymentQris(int paymentId) async {
+    try {
+      final response = await ApiClient.instance.post(
+        '${ApiConstants.payments}/$paymentId/qris',
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      return PaymentQrisModel.fromJson(data);
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+      return null;
+    } catch (_) {
+      state = state.copyWith(error: 'Gagal membuat QRIS Iuran.');
+      return null;
+    }
+  }
+
+  Future<bool> checkPaymentQrisStatus(int paymentId) async {
+    try {
+      final response = await ApiClient.instance.get(
+        '${ApiConstants.payments}/$paymentId/qris/status',
+      );
+      final data = extractData(response) as Map<String, dynamic>;
+      final paid = data['paid'] == true;
+      final paymentRaw = data['payment'];
+
+      if (paymentRaw is Map<String, dynamic>) {
+        final updated = PaymentModel.fromJson(paymentRaw);
+        state = state.copyWith(
+          payments: state.payments
+              .map((p) => p.id == updated.id ? updated : p)
+              .toList(),
+        );
+      }
+
+      return paid;
+    } on DioException catch (e) {
+      state = state.copyWith(error: extractErrorMessage(e));
+      return false;
+    } catch (_) {
+      state = state.copyWith(error: 'Gagal mengecek status pembayaran.');
       return false;
     }
   }
@@ -142,41 +191,42 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
 
 final paymentProvider =
     StateNotifierProvider.family<PaymentNotifier, PaymentState, int>(
-  (ref, classId) => PaymentNotifier(classId),
-);
+      (ref, classId) => PaymentNotifier(classId),
+    );
 
 // Grouped by week (week ASC), each group sorted by name ASC.
 final paymentsByWeekProvider =
     Provider.family<Map<int, List<PaymentModel>>, int>((ref, classId) {
-  final payments = ref.watch(paymentProvider(classId)).payments;
-  final grouped = <int, List<PaymentModel>>{};
-  for (final p in payments) {
-    (grouped[p.paymentWeek] ??= []).add(p);
-  }
-  for (final list in grouped.values) {
-    list.sort((a, b) => (a.userName ?? '').compareTo(b.userName ?? ''));
-  }
-  final sorted = Map.fromEntries(
-    grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
-  );
-  return sorted;
-});
+      final payments = ref.watch(paymentProvider(classId)).payments;
+      final grouped = <int, List<PaymentModel>>{};
+      for (final p in payments) {
+        (grouped[p.paymentWeek] ??= []).add(p);
+      }
+      for (final list in grouped.values) {
+        list.sort((a, b) => (a.userName ?? '').compareTo(b.userName ?? ''));
+      }
+      final sorted = Map.fromEntries(
+        grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+      );
+      return sorted;
+    });
 
 // Current user's own payments sorted by week ASC.
 final myPaymentsProvider =
-    Provider.family<List<PaymentModel>, ({int classId, int userId})>(
-  (ref, params) {
-    final payments = ref.watch(paymentProvider(params.classId)).payments;
-    return payments
-        .where((p) => p.userId == params.userId)
-        .toList()
-      ..sort((a, b) => a.paymentWeek.compareTo(b.paymentWeek));
-  },
-);
+    Provider.family<List<PaymentModel>, ({int classId, int userId})>((
+      ref,
+      params,
+    ) {
+      final payments = ref.watch(paymentProvider(params.classId)).payments;
+      return payments.where((p) => p.userId == params.userId).toList()
+        ..sort((a, b) => a.paymentWeek.compareTo(b.paymentWeek));
+    });
 
 // Aggregate summary computed from the full list.
-final paymentSummaryProvider =
-    Provider.family<PaymentSummary, int>((ref, classId) {
+final paymentSummaryProvider = Provider.family<PaymentSummary, int>((
+  ref,
+  classId,
+) {
   final payments = ref.watch(paymentProvider(classId)).payments;
   final paid = payments.where((p) => p.isPaid).toList();
   final unpaid = payments.where((p) => !p.isPaid).toList();

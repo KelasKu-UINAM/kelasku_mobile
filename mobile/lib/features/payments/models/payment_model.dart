@@ -10,6 +10,10 @@ class PaymentModel {
   final String status;
   final DateTime? paidAt;
   final String? note;
+  final String? pakasirOrderId;
+  final String? pakasirPaymentUrl;
+  final String? pakasirQrString;
+  final DateTime? expiresAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   // From JOIN users (getClassPayments only — null in getMyPayments)
@@ -26,6 +30,10 @@ class PaymentModel {
     required this.status,
     this.paidAt,
     this.note,
+    this.pakasirOrderId,
+    this.pakasirPaymentUrl,
+    this.pakasirQrString,
+    this.expiresAt,
     this.createdAt,
     this.updatedAt,
     this.userName,
@@ -37,8 +45,10 @@ class PaymentModel {
 
   String get formattedAmount {
     final s = amount.toInt().toString();
-    final formatted =
-        s.replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]}.');
+    final formatted = s.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]}.',
+    );
     return 'Rp $formatted';
   }
 
@@ -52,11 +62,18 @@ class PaymentModel {
       id: (json['id'] as num).toInt(),
       classId: (json['class_id'] as num).toInt(),
       userId: (json['user_id'] as num).toInt(),
-      amount: (json['amount'] as num).toDouble(),
+      amount: (json['amount'] is String
+          ? double.parse(json['amount'] as String)
+          : (json['amount'] as num))
+          .toDouble(),
       paymentWeek: (json['payment_week'] as num).toInt(),
       status: json['status'] as String? ?? 'unpaid',
       paidAt: _parseDate(json['paid_at']),
       note: json['note'] as String?,
+      pakasirOrderId: json['pakasir_order_id'] as String?,
+      pakasirPaymentUrl: json['pakasir_payment_url'] as String?,
+      pakasirQrString: json['pakasir_qr_string'] as String?,
+      expiresAt: _parseDate(json['expires_at']),
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
       userName: json['user_name'] as String?,
@@ -74,6 +91,10 @@ class PaymentModel {
   PaymentModel copyWith({
     String? status,
     DateTime? paidAt,
+    String? pakasirOrderId,
+    String? pakasirPaymentUrl,
+    String? pakasirQrString,
+    DateTime? expiresAt,
     DateTime? updatedAt,
   }) {
     return PaymentModel(
@@ -85,6 +106,10 @@ class PaymentModel {
       status: status ?? this.status,
       paidAt: paidAt ?? this.paidAt,
       note: note,
+      pakasirOrderId: pakasirOrderId ?? this.pakasirOrderId,
+      pakasirPaymentUrl: pakasirPaymentUrl ?? this.pakasirPaymentUrl,
+      pakasirQrString: pakasirQrString ?? this.pakasirQrString,
+      expiresAt: expiresAt ?? this.expiresAt,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       userName: userName,
@@ -99,6 +124,39 @@ class PaymentModel {
 
   @override
   int get hashCode => id.hashCode;
+}
+
+@immutable
+class PaymentQrisModel {
+  final int paymentId;
+  final String orderId;
+  final double amount;
+  final String? paymentUrl;
+  final String? qrString;
+  final DateTime? expiredAt;
+  final String? expiredTime;
+
+  const PaymentQrisModel({
+    required this.paymentId,
+    required this.orderId,
+    required this.amount,
+    this.paymentUrl,
+    this.qrString,
+    this.expiredAt,
+    this.expiredTime,
+  });
+
+  factory PaymentQrisModel.fromJson(Map<String, dynamic> json) {
+    return PaymentQrisModel(
+      paymentId: (json['payment_id'] as num).toInt(),
+      orderId: json['order_id'] as String? ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      paymentUrl: json['payment_url'] as String?,
+      qrString: json['qr_string'] as String?,
+      expiredAt: PaymentModel._parseDate(json['expired_at']),
+      expiredTime: json['expired_time'] as String?,
+    );
+  }
 }
 
 @immutable

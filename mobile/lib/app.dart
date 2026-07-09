@@ -11,6 +11,7 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/classes/screens/class_detail_screen.dart';
 import 'features/classes/screens/class_list_screen.dart';
+import 'features/classes/providers/class_provider.dart';
 import 'features/classes/screens/create_class_screen.dart';
 import 'features/classes/screens/edit_class_screen.dart';
 import 'features/classes/screens/join_class_screen.dart';
@@ -40,6 +41,25 @@ class KelaskuApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final classState = ref.watch(classProvider);
+
+    ref.listen(authProvider, (previous, next) {
+      if (next is AuthAuthenticated) {
+        ref.read(classProvider.notifier).fetchClasses(forceRefresh: true);
+      }
+    });
+
+    if (authState is AuthAuthenticated &&
+        classState.classes.isEmpty &&
+        !classState.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (ref.read(authProvider) is AuthAuthenticated) {
+          ref.read(classProvider.notifier).fetchClasses(forceRefresh: true);
+        }
+      });
+    }
+
     final isAuth = ref.watch(isAuthenticatedProvider);
     final router = _buildRouter(isAuth);
 

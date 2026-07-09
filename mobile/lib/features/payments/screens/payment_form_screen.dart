@@ -39,10 +39,8 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final week = int.tryParse(_weekCtrl.text.trim()) ?? 0;
-    final amount = double.tryParse(
-          _amountCtrl.text.trim().replaceAll('.', ''),
-        ) ??
-        0;
+    final amount =
+        double.tryParse(_amountCtrl.text.trim().replaceAll('.', '')) ?? 0;
 
     // Check if week already has payments
     final existing = ref.read(paymentProvider(widget.classId)).payments;
@@ -55,13 +53,13 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     }
 
     setState(() => _isSubmitting = true);
-    final ok =
-        await ref.read(paymentProvider(widget.classId).notifier).createPayments(
-              paymentWeek: week,
-              amount: amount,
-              note:
-                  _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-            );
+    final ok = await ref
+        .read(paymentProvider(widget.classId).notifier)
+        .createPayments(
+          paymentWeek: week,
+          amount: amount,
+          note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+        );
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -134,9 +132,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               style: AppTextStyles.inputText,
-              decoration: _decoration(
-                hint: 'Contoh: $nextWeek',
-              ),
+              decoration: _decoration(hint: 'Contoh: $nextWeek'),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) {
                   return 'Minggu ke- wajib diisi';
@@ -171,8 +167,8 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                   return 'Nominal wajib diisi';
                 }
                 final a = double.tryParse(v.trim());
-                if (a == null || a <= 0) {
-                  return 'Masukkan nominal yang valid';
+                if (a == null || a < 1000) {
+                  return 'Min 1000/Minggu';
                 }
                 return null;
               },
@@ -238,13 +234,13 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
               child: prefix,
             )
           : null,
-      prefixIconConstraints:
-          prefix != null ? const BoxConstraints(minWidth: 0) : null,
+      prefixIconConstraints: prefix != null
+          ? const BoxConstraints(minWidth: 0)
+          : null,
       filled: true,
       fillColor: AppColors.card,
       isDense: true,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.border),
