@@ -305,19 +305,19 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _SubjectSection extends StatelessWidget {
+class _SubjectSection extends ConsumerWidget {
   final ClassModel kelas;
 
   const _SubjectSection({required this.kelas});
 
-  final _dummies = const [
-    ('SI401', 'Pemrograman Mobile', 'Dr. Ahmad Rahman, M.Kom.'),
-    ('SI402', 'Basis Data Lanjut', 'Nur Aisyah, S.Kom., M.T.'),
-    ('SI403', 'Rekayasa Perangkat Lunak', 'Muhammad Fadli, M.Kom.'),
-  ];
+  // Preview only — the full list lives at /matkul/:classId.
+  static const _maxPreview = 3;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subjects = ref.watch(subjectListProvider(kelas.id));
+    final preview = subjects.take(_maxPreview).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -330,14 +330,7 @@ class _SubjectSection extends StatelessWidget {
               ),
             ),
             InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Daftar mata kuliah akan ada di Phase 5.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
+              onTap: () => context.push('/matkul/${kelas.id}'),
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -353,17 +346,42 @@ class _SubjectSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: const Border.fromBorderSide(BorderSide(color: AppColors.border)),
           ),
-          child: Column(
-            children: [
-              for (var i = 0; i < _dummies.length; i++)
-                _SubjectRow(
-                  code: _dummies[i].$1,
-                  name: _dummies[i].$2,
-                  lecturer: _dummies[i].$3,
-                  isLast: i == _dummies.length - 1,
+          child: subjects.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.menu_book_outlined,
+                        size: 18,
+                        color: AppColors.textMuted,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Belum ada mata kuliah.',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < preview.length; i++)
+                      _SubjectRow(
+                        code: preview[i].code ?? '-',
+                        name: preview[i].name,
+                        lecturer: preview[i].lecturer ?? '-',
+                        isLast: i == preview.length - 1,
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
       ],
     );

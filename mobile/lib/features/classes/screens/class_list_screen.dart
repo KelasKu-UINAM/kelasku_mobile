@@ -33,7 +33,7 @@ class _ClassListScreenState extends ConsumerState<ClassListScreen> {
       appBar: AppBar(title: const Text('Kelas Saya')),
       floatingActionButton: FloatingActionButton(
         heroTag: 'kelas_fab',
-        onPressed: () => _showAddSheet(context, state.classes),
+        onPressed: () => _showAddSheet(context),
         child: const Icon(Icons.add),
       ),
       body: state.isLoading
@@ -51,9 +51,7 @@ class _ClassListScreenState extends ConsumerState<ClassListScreen> {
     );
   }
 
-  void _showAddSheet(BuildContext context, List<ClassModel> classes) {
-    final isAdmin = classes.any((c) => c.roleInClass == 'admin_komting');
-
+  void _showAddSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -74,19 +72,22 @@ class _ClassListScreenState extends ConsumerState<ClassListScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (isAdmin)
-                _SheetTile(
-                  icon: Icons.add_circle_outline,
-                  label: 'Buat Kelas Baru',
-                  subtitle: 'Kamu akan menjadi Komting',
-                  onTap: () async {
-                    Navigator.pop(sheetCtx);
-                    final result = await context.push<bool>('/kelas/buat');
-                    if (result == true && mounted) {
-                      ref.read(classProvider.notifier).fetchClasses();
-                    }
-                  },
-                ),
+              // Anyone may create a class — the backend makes the creator
+              // admin_komting (class.service.js createClass). Gating this on
+              // "already admin somewhere" was a chicken-and-egg bug: new
+              // users could never create their first class.
+              _SheetTile(
+                icon: Icons.add_circle_outline,
+                label: 'Buat Kelas Baru',
+                subtitle: 'Kamu akan menjadi Komting',
+                onTap: () async {
+                  Navigator.pop(sheetCtx);
+                  final result = await context.push<bool>('/kelas/buat');
+                  if (result == true && mounted) {
+                    ref.read(classProvider.notifier).fetchClasses();
+                  }
+                },
+              ),
               _SheetTile(
                 icon: Icons.vpn_key_outlined,
                 label: 'Gabung dengan Kode',
@@ -137,6 +138,16 @@ class _ClassListScreenState extends ConsumerState<ClassListScreen> {
               icon: const Icon(Icons.vpn_key_outlined, size: 18),
               label: const Text('Gabung dengan Kode'),
             ),
+            TextButton.icon(
+              onPressed: () async {
+                final result = await context.push<bool>('/kelas/buat');
+                if (result == true && mounted) {
+                  ref.read(classProvider.notifier).fetchClasses();
+                }
+              },
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text('Buat Kelas Baru'),
+            ),
           ],
         ),
       ),
@@ -146,7 +157,8 @@ class _ClassListScreenState extends ConsumerState<ClassListScreen> {
   Widget _buildList(BuildContext context, List<ClassModel> classes) {
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () => ref.read(classProvider.notifier).fetchClasses(),
+      onRefresh: () =>
+          ref.read(classProvider.notifier).fetchClasses(forceRefresh: true),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
         itemCount: classes.length + 1,
