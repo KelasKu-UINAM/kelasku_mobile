@@ -111,6 +111,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Updates the profile and syncs the in-memory user on success.
+  /// Returns null on success, or an error message to display.
+  Future<String?> updateProfile({
+    required String name,
+    String? phone,
+  }) async {
+    final current = state;
+    if (current is! AuthAuthenticated) return 'Sesi berakhir. Login ulang.';
+
+    try {
+      final updated = await _service.updateProfile(name: name, phone: phone);
+      state = AuthAuthenticated(user: updated, token: current.token);
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Terjadi kesalahan. Coba lagi.';
+    }
+  }
+
+  /// Returns null on success, or an error message to display.
+  Future<String?> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _service.changePassword(
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+      );
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Terjadi kesalahan. Coba lagi.';
+    }
+  }
+
   void clearError() {
     if (state is AuthFailure) {
       state = const AuthInitial();

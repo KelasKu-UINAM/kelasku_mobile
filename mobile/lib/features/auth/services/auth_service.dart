@@ -92,4 +92,50 @@ class AuthService {
       throw const AuthException('Terjadi kesalahan. Coba lagi.');
     }
   }
+
+  /// Updates name/phone of the logged-in user. Email cannot be changed.
+  Future<User> updateProfile({required String name, String? phone}) async {
+    try {
+      final response = await ApiClient.instance.put(
+        '${ApiConstants.auth}/profile',
+        data: {
+          'name': name,
+          'phone': (phone == null || phone.isEmpty) ? null : phone,
+        },
+      );
+
+      final data = extractData(response) as Map<String, dynamic>;
+      return User.fromJson(data);
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final message = extractErrorMessage(e);
+      throw AuthException(message, statusCode: statusCode);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw const AuthException('Terjadi kesalahan. Coba lagi.');
+    }
+  }
+
+  /// Changes the password; the backend verifies [oldPassword] first.
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await ApiClient.instance.put(
+        '${ApiConstants.auth}/password',
+        data: {
+          'old_password': oldPassword,
+          'new_password': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final message = extractErrorMessage(e);
+      throw AuthException(message, statusCode: statusCode);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw const AuthException('Terjadi kesalahan. Coba lagi.');
+    }
+  }
 }

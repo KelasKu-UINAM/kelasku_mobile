@@ -74,10 +74,13 @@ class ApiClient {
   void _handleUnauthorized(DioException error) {
     if (error.response?.statusCode != 401) return;
 
-    // A 401 from login/register means wrong credentials, not an expired
-    // session — let the caller show its own error message.
+    // A 401 from login/register means wrong credentials, and a 401 from
+    // change-password means the old password was wrong — neither is an
+    // expired session; let the caller show its own error message.
     final path = error.requestOptions.path;
-    if (path.contains('/auth/login') || path.contains('/auth/register')) {
+    if (path.contains('/auth/login') ||
+        path.contains('/auth/register') ||
+        path.contains('/auth/password')) {
       return;
     }
 

@@ -49,11 +49,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  // Reset password requires an email/OTP service on the backend — not yet
+  // available. Deliberately left disabled with a clear message.
   void _showForgotPasswordHint() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Fitur lupa password belum tersedia.'),
-        duration: Duration(seconds: 2),
+        content: Text(
+          'Fitur lupa password belum tersedia. '
+          'Silakan hubungi komting kelas Anda.',
+        ),
+        duration: Duration(seconds: 3),
       ),
     );
   }
