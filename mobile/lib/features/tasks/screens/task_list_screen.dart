@@ -88,7 +88,7 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
       );
     }
 
-    final activeClass = classes.first;
+    final activeClass = ref.watch(activeClassProvider) ?? classes.first;
     final isAdmin = activeClass.roleInClass == 'admin_komting';
     final taskState = ref.watch(taskProvider(activeClass.id));
     final allTasks = ref.watch(taskListProvider(activeClass.id));

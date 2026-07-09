@@ -93,19 +93,23 @@ class AnnouncementPreview {
 
 @immutable
 class IuranSummary {
+  /// Paid bills across all weeks.
   final int paidCount;
-  final int totalMembers;
+
+  /// Total bills (paid + unpaid) across all weeks.
+  final int totalBills;
+
   final String periodLabel;
 
   const IuranSummary({
     required this.paidCount,
-    required this.totalMembers,
+    required this.totalBills,
     required this.periodLabel,
   });
 
-  double get progress => totalMembers > 0 ? paidCount / totalMembers : 0;
+  double get progress => totalBills > 0 ? paidCount / totalBills : 0;
 
-  int get unpaidCount => totalMembers - paidCount;
+  int get unpaidCount => totalBills - paidCount;
 }
 
 @immutable

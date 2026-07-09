@@ -47,8 +47,8 @@ String _daysLabel(DateTime deadline, {DateTime? now}) {
 final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   ref.keepAlive();
   final user = ref.watch(currentUserProvider);
-  final classes = ref.watch(classListProvider);
-  final firstClass = classes.isEmpty ? null : classes.first;
+  // Follows the user-selected active class (falls back to first class).
+  final firstClass = ref.watch(activeClassProvider);
 
   final now = DateTime.now();
   final greeting = _greeting(now);
@@ -126,18 +126,22 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
       );
     }
 
-    // Parse payment summary.
+    // Parse payment summary. The backend aggregates across ALL weeks, so
+    // present it as paid bills vs total bills — not members "this week".
     IuranSummary? iuranSummary;
     final paymentRaw = data['payment_summary'] as Map<String, dynamic>?;
     if (paymentRaw != null) {
-      final totalMembers =
-          (paymentRaw['total_members'] as num?)?.toInt() ?? 0;
       final totalPaid = (paymentRaw['total_paid'] as num?)?.toInt() ?? 0;
-      iuranSummary = IuranSummary(
-        paidCount: totalPaid,
-        totalMembers: totalMembers,
-        periodLabel: 'Minggu ini',
-      );
+      final totalUnpaid =
+          (paymentRaw['total_unpaid'] as num?)?.toInt() ?? 0;
+      final totalBills = totalPaid + totalUnpaid;
+      if (totalBills > 0) {
+        iuranSummary = IuranSummary(
+          paidCount: totalPaid,
+          totalBills: totalBills,
+          periodLabel: 'Semua minggu',
+        );
+      }
     }
 
     return DashboardData(

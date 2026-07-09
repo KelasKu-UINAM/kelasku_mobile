@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/services/api_client.dart';
@@ -211,6 +212,53 @@ final classByIdProvider = Provider.family<ClassModel?, int>((ref, id) {
   return ref.watch(classListProvider).cast<ClassModel?>().firstWhere(
         (c) => c?.id == id,
         orElse: () => null,
+      );
+});
+
+// ── Active class (user-selected, persisted) ───────────────────
+
+class ActiveClassIdNotifier extends StateNotifier<int?> {
+  ActiveClassIdNotifier() : super(null) {
+    _restore();
+  }
+
+  static const _keyActiveClassId = 'active_class_id';
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  Future<void> _restore() async {
+    final raw = await _storage.read(key: _keyActiveClassId);
+    final restored = int.tryParse(raw ?? '');
+    // Don't clobber a selection made while the read was in flight.
+    if (state == null && restored != null) state = restored;
+  }
+
+  Future<void> select(int classId) async {
+    state = classId;
+    await _storage.write(key: _keyActiveClassId, value: '$classId');
+  }
+
+  Future<void> clear() async {
+    state = null;
+    await _storage.delete(key: _keyActiveClassId);
+  }
+}
+
+final activeClassIdProvider =
+    StateNotifierProvider<ActiveClassIdNotifier, int?>(
+  (ref) => ActiveClassIdNotifier(),
+);
+
+/// The class every "active class" surface (dashboard/jadwal/tugas/forum)
+/// works against: the persisted selection when it still exists in the
+/// user's class list, otherwise the first class.
+final activeClassProvider = Provider<ClassModel?>((ref) {
+  final classes = ref.watch(classListProvider);
+  if (classes.isEmpty) return null;
+
+  final selectedId = ref.watch(activeClassIdProvider);
+  return classes.cast<ClassModel?>().firstWhere(
+        (c) => c?.id == selectedId,
+        orElse: () => classes.first,
       );
 });
 

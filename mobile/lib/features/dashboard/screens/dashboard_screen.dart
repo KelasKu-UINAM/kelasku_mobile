@@ -178,13 +178,16 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _ActiveClassRow extends StatelessWidget {
+class _ActiveClassRow extends ConsumerWidget {
   final ClassInfo activeClass;
 
   const _ActiveClassRow({required this.activeClass});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final classes = ref.watch(classListProvider);
+    final canSwitch = classes.length > 1;
+
     return Material(
       color: AppColors.backgroundAlt,
       child: InkWell(
@@ -222,9 +225,64 @@ class _ActiveClassRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
+              if (canSwitch)
+                InkWell(
+                  onTap: () => _showClassPicker(context, ref),
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.swap_horiz,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                )
+              else
+                const Icon(Icons.chevron_right,
+                    size: 18, color: AppColors.textMuted),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showClassPicker(BuildContext context, WidgetRef ref) {
+    final classes = ref.read(classListProvider);
+
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 14),
+            Text('Pilih Kelas Aktif', style: AppTextStyles.h3),
+            const SizedBox(height: 6),
+            for (final kelas in classes)
+              ListTile(
+                leading: Icon(
+                  kelas.id == activeClass.id
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: kelas.id == activeClass.id
+                      ? AppColors.primary
+                      : AppColors.textMuted,
+                ),
+                title: Text(kelas.name),
+                onTap: () {
+                  ref
+                      .read(activeClassIdProvider.notifier)
+                      .select(kelas.id);
+                  Navigator.pop(sheetCtx);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -724,7 +782,7 @@ class _IuranSummarySection extends StatelessWidget {
                       ),
                     ),
                     TextSpan(
-                      text: ' dari ${summary.totalMembers} sudah bayar',
+                      text: ' dari ${summary.totalBills} tagihan lunas',
                     ),
                   ],
                 ),

@@ -65,7 +65,7 @@ class _ForumListScreenState extends ConsumerState<ForumListScreen> {
       );
     }
 
-    final activeClass = classes.first;
+    final activeClass = ref.watch(activeClassProvider) ?? classes.first;
     final classId = activeClass.id;
     final canCreate = activeClass.roleInClass == 'admin_komting';
 

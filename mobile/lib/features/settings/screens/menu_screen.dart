@@ -31,8 +31,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final classes = ref.watch(classProvider).classes;
-    final activeClass = classes.isEmpty ? null : classes.first;
+    final activeClass = ref.watch(activeClassProvider);
     final classId = activeClass?.id;
     final role = activeClass?.roleInClass;
     final isAdmin = role == 'admin_komting';

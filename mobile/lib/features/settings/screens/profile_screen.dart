@@ -110,8 +110,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final classes = ref.watch(classProvider).classes;
-    final activeClass = classes.isEmpty ? null : classes.first;
+    final activeClass = ref.watch(activeClassProvider);
     final role = activeClass?.roleInClass;
     final showRole = role == 'admin_komting' || role == 'bendahara';
 

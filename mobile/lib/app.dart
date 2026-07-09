@@ -117,6 +117,18 @@ class KelaskuApp extends ConsumerWidget {
   }
 }
 
+int? _pathInt(GoRouterState state, String name) =>
+    int.tryParse(state.pathParameters[name] ?? '');
+
+int? _queryInt(GoRouterState state, String name) =>
+    int.tryParse(state.uri.queryParameters[name] ?? '');
+
+/// Guard for routes that need valid integer params: instead of silently
+/// falling back to id 0 (which hits the API with a bogus id), redirect the
+/// user to the class list to pick a class first.
+String? _requireInts(List<int?> values) =>
+    values.any((v) => v == null) ? '/kelas' : null;
+
 GoRouter _buildRouter(bool isAuth) => GoRouter(
   initialLocation: isAuth ? '/home' : '/login',
   redirect: (context, state) {
@@ -201,75 +213,70 @@ GoRouter _buildRouter(bool isAuth) => GoRouter(
     GoRoute(
       path: '/jadwal/tambah',
       name: 'jadwal-tambah',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return ScheduleFormScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          ScheduleFormScreen(classId: _queryInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/jadwal/:scheduleId/edit',
       name: 'jadwal-edit',
-      builder: (_, state) {
-        final scheduleId =
-            int.tryParse(state.pathParameters['scheduleId'] ?? '') ?? 0;
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return ScheduleFormScreen(classId: classId, scheduleId: scheduleId);
-      },
+      redirect: (_, state) => _requireInts([
+        _pathInt(state, 'scheduleId'),
+        _queryInt(state, 'classId'),
+      ]),
+      builder: (_, state) => ScheduleFormScreen(
+        classId: _queryInt(state, 'classId')!,
+        scheduleId: _pathInt(state, 'scheduleId')!,
+      ),
     ),
 
     // ── Tugas routes ──────────────────────────────────────────────
     GoRoute(
       path: '/tugas/tambah',
       name: 'tugas-tambah',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return TaskFormScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          TaskFormScreen(classId: _queryInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/tugas/:taskId/edit',
       name: 'tugas-edit',
-      builder: (_, state) {
-        final taskId =
-            int.tryParse(state.pathParameters['taskId'] ?? '') ?? 0;
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return TaskFormScreen(classId: classId, taskId: taskId);
-      },
+      redirect: (_, state) => _requireInts([
+        _pathInt(state, 'taskId'),
+        _queryInt(state, 'classId'),
+      ]),
+      builder: (_, state) => TaskFormScreen(
+        classId: _queryInt(state, 'classId')!,
+        taskId: _pathInt(state, 'taskId')!,
+      ),
     ),
     GoRoute(
       path: '/tugas/:taskId',
       name: 'tugas-detail',
-      builder: (_, state) {
-        final taskId =
-            int.tryParse(state.pathParameters['taskId'] ?? '') ?? 0;
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return TaskDetailScreen(classId: classId, taskId: taskId);
-      },
+      redirect: (_, state) => _requireInts([
+        _pathInt(state, 'taskId'),
+        _queryInt(state, 'classId'),
+      ]),
+      builder: (_, state) => TaskDetailScreen(
+        classId: _queryInt(state, 'classId')!,
+        taskId: _pathInt(state, 'taskId')!,
+      ),
     ),
 
     // ── Iuran routes ─────────────────────────────────────────────
     GoRoute(
       path: '/iuran',
       name: 'iuran',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return PaymentListScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          PaymentListScreen(classId: _queryInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/iuran/tambah',
       name: 'iuran-tambah',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return PaymentFormScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          PaymentFormScreen(classId: _queryInt(state, 'classId')!),
     ),
 
     // ── Settings & Profil routes ─────────────────────────────────
@@ -286,106 +293,98 @@ GoRouter _buildRouter(bool isAuth) => GoRouter(
     GoRoute(
       path: '/pengaturan/whatsapp',
       name: 'pengaturan-whatsapp',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return WhatsappConfigScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          WhatsappConfigScreen(classId: _queryInt(state, 'classId')!),
     ),
 
     // ── Forum routes ─────────────────────────────────────────────
     GoRoute(
       path: '/forum/buat',
       name: 'forum-buat',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return ForumFormScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          ForumFormScreen(classId: _queryInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/forum/:forumId',
       name: 'forum-chat',
-      builder: (_, state) {
-        final forumId =
-            int.tryParse(state.pathParameters['forumId'] ?? '') ?? 0;
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return ChatScreen(classId: classId, forumId: forumId);
-      },
+      redirect: (_, state) => _requireInts([
+        _pathInt(state, 'forumId'),
+        _queryInt(state, 'classId'),
+      ]),
+      builder: (_, state) => ChatScreen(
+        classId: _queryInt(state, 'classId')!,
+        forumId: _pathInt(state, 'forumId')!,
+      ),
     ),
 
     // ── Pengumuman routes ─────────────────────────────────────────
     GoRoute(
       path: '/pengumuman',
       name: 'pengumuman-list',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return AnnouncementListScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          AnnouncementListScreen(classId: _queryInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/pengumuman/tambah',
       name: 'pengumuman-tambah',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return AnnouncementFormScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_queryInt(state, 'classId')]),
+      builder: (_, state) =>
+          AnnouncementFormScreen(classId: _queryInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/pengumuman/:id/edit',
       name: 'pengumuman-edit',
-      builder: (_, state) {
-        final id =
-            int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return AnnouncementFormScreen(classId: classId, announcementId: id);
-      },
+      redirect: (_, state) => _requireInts([
+        _pathInt(state, 'id'),
+        _queryInt(state, 'classId'),
+      ]),
+      builder: (_, state) => AnnouncementFormScreen(
+        classId: _queryInt(state, 'classId')!,
+        announcementId: _pathInt(state, 'id')!,
+      ),
     ),
     GoRoute(
       path: '/pengumuman/:id',
       name: 'pengumuman-detail',
-      builder: (_, state) {
-        final id =
-            int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return AnnouncementDetailScreen(classId: classId, announcementId: id);
-      },
+      redirect: (_, state) => _requireInts([
+        _pathInt(state, 'id'),
+        _queryInt(state, 'classId'),
+      ]),
+      builder: (_, state) => AnnouncementDetailScreen(
+        classId: _queryInt(state, 'classId')!,
+        announcementId: _pathInt(state, 'id')!,
+      ),
     ),
 
     // ── Mata Kuliah routes ────────────────────────────────────────
     GoRoute(
       path: '/matkul/:classId',
       name: 'matkul-list',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.pathParameters['classId'] ?? '') ?? 0;
-        return SubjectListScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_pathInt(state, 'classId')]),
+      builder: (_, state) =>
+          SubjectListScreen(classId: _pathInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/matkul/:classId/tambah',
       name: 'matkul-tambah',
-      builder: (_, state) {
-        final classId =
-            int.tryParse(state.pathParameters['classId'] ?? '') ?? 0;
-        return SubjectFormScreen(classId: classId);
-      },
+      redirect: (_, state) => _requireInts([_pathInt(state, 'classId')]),
+      builder: (_, state) =>
+          SubjectFormScreen(classId: _pathInt(state, 'classId')!),
     ),
     GoRoute(
       path: '/matkul/:subjectId/edit',
       name: 'matkul-edit',
-      builder: (_, state) {
-        final subjectId =
-            int.tryParse(state.pathParameters['subjectId'] ?? '') ?? 0;
-        final classId =
-            int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 0;
-        return SubjectFormScreen(classId: classId, subjectId: subjectId);
-      },
+      redirect: (_, state) => _requireInts([
+        _pathInt(state, 'subjectId'),
+        _queryInt(state, 'classId'),
+      ]),
+      builder: (_, state) => SubjectFormScreen(
+        classId: _queryInt(state, 'classId')!,
+        subjectId: _pathInt(state, 'subjectId')!,
+      ),
     ),
 
     // ── Detail routes (di luar shell, push navigation) ───────────
@@ -407,20 +406,21 @@ GoRouter _buildRouter(bool isAuth) => GoRouter(
     GoRoute(
       path: '/kelas/:id',
       name: 'kelas-detail',
+      redirect: (_, state) => _requireInts([_pathInt(state, 'id')]),
       builder: (_, state) {
-        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
-        final tab =
-            int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
-        return ClassDetailScreen(classId: id, initialTabIndex: tab);
+        final tab = _queryInt(state, 'tab') ?? 0;
+        return ClassDetailScreen(
+          classId: _pathInt(state, 'id')!,
+          initialTabIndex: tab,
+        );
       },
     ),
     GoRoute(
       path: '/kelas/:id/edit',
       name: 'kelas-edit',
-      builder: (_, state) {
-        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
-        return EditClassScreen(classId: id);
-      },
+      redirect: (_, state) => _requireInts([_pathInt(state, 'id')]),
+      builder: (_, state) =>
+          EditClassScreen(classId: _pathInt(state, 'id')!),
     ),
   ],
 );

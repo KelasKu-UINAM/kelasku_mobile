@@ -118,7 +118,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
       );
     }
 
-    final activeClass = classes.first;
+    final activeClass = ref.watch(activeClassProvider) ?? classes.first;
     final isAdmin = activeClass.roleInClass == 'admin_komting';
 
     _fetchSchedulesFor(activeClass.id);
