@@ -8,6 +8,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/providers/class_provider.dart';
+import '../../subjects/providers/subject_provider.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
 
@@ -92,16 +93,38 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
     final isAdmin = activeClass.roleInClass == 'admin_komting';
     final taskState = ref.watch(taskProvider(activeClass.id));
     final allTasks = ref.watch(taskListProvider(activeClass.id));
+    final subjectState = ref.watch(subjectProvider(activeClass.id));
+    final followedCount =
+        ref.watch(followedSubjectCountProvider(activeClass.id));
 
+    // Safe on every rebuild: both notifiers guard with _loaded/_inFlight.
     Future.microtask(() {
       ref.read(taskProvider(activeClass.id).notifier).fetchTasks();
+      ref.read(subjectProvider(activeClass.id).notifier).fetchSubjects();
     });
 
     final filtered = _filtered(allTasks);
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Tugas')),
+      appBar: AppBar(
+        title: const Text('Tugas'),
+        actions: [
+          IconButton(
+            tooltip: taskState.followedOnly
+                ? 'Tampilkan semua mata kuliah'
+                : 'Hanya mata kuliah yang diikuti',
+            icon: Icon(
+              taskState.followedOnly
+                  ? Icons.filter_alt
+                  : Icons.filter_alt_off,
+            ),
+            onPressed: () => ref
+                .read(taskProvider(activeClass.id).notifier)
+                .setFollowedOnly(!taskState.followedOnly),
+          ),
+        ],
+      ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
               heroTag: 'task_fab',
@@ -115,35 +138,126 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: taskState.isLoading && allTasks.isEmpty
-          ? const LoadingWidget(message: 'Memuat tugas...')
-          : taskState.error != null && allTasks.isEmpty
-              ? ErrorStateWidget(
-                  message: taskState.error!,
-                  onRetry: () => ref
-                      .read(taskProvider(activeClass.id).notifier)
-                      .fetchTasks(forceRefresh: true),
-                )
-              : Column(
-                  children: [
-                    _FilterTabRow(
-                      activeTab: _activeTab,
-                      onSelect: (t) => setState(() => _activeTab = t),
+      body: _buildBody(
+        activeClass.id,
+        isAdmin,
+        taskState,
+        subjectState,
+        followedCount,
+        allTasks,
+        filtered,
+      ),
+    );
+  }
+
+  /// Loading / error / three empty situations (no subjects at all, none
+  /// followed while filtering, or simply no tasks) / task list.
+  Widget _buildBody(
+    int classId,
+    bool isAdmin,
+    TaskState taskState,
+    SubjectState subjectState,
+    int followedCount,
+    List<TaskModel> allTasks,
+    List<TaskModel> filtered,
+  ) {
+    if ((taskState.isLoading && allTasks.isEmpty) ||
+        (subjectState.isLoading && subjectState.subjects.isEmpty)) {
+      return const LoadingWidget(message: 'Memuat tugas...');
+    }
+
+    if (taskState.error != null && allTasks.isEmpty) {
+      return ErrorStateWidget(
+        message: taskState.error!,
+        onRetry: () {
+          ref.read(taskProvider(classId).notifier).fetchTasks(
+                forceRefresh: true,
+              );
+          ref.read(subjectProvider(classId).notifier).fetchSubjects(
+                forceRefresh: true,
+              );
+        },
+      );
+    }
+
+    if (subjectState.subjects.isEmpty && !subjectState.isLoading) {
+      return EmptyStateWidget(
+        icon: Icons.menu_book_outlined,
+        title: 'Belum ada mata kuliah',
+        description: isAdmin
+            ? 'Tambahkan mata kuliah dulu, lalu buat tugasnya.'
+            : 'Komting belum menambahkan mata kuliah di kelas ini.',
+        actionLabel: isAdmin ? 'Kelola Mata Kuliah' : null,
+        onAction: isAdmin ? () => context.push('/matkul/$classId') : null,
+      );
+    }
+
+    if (taskState.followedOnly && followedCount == 0) {
+      return EmptyStateWidget(
+        icon: Icons.bookmark_add_outlined,
+        title: 'Belum ada mata kuliah yang diikuti',
+        description:
+            'Tandai mata kuliah yang kamu ambil untuk melihat tugasnya di sini.',
+        actionLabel: 'Pilih Mata Kuliah',
+        onAction: () => context.push('/matkul/$classId'),
+      );
+    }
+
+    return Column(
+      children: [
+        if (taskState.followedOnly)
+          _FilterBanner(
+            text: 'Menampilkan: mata kuliah yang diikuti ($followedCount)',
+          ),
+        _FilterTabRow(
+          activeTab: _activeTab,
+          onSelect: (t) => setState(() => _activeTab = t),
+        ),
+        Expanded(
+          child: allTasks.isEmpty
+              ? _EmptyState(isAdmin: isAdmin, classId: classId)
+              : filtered.isEmpty
+                  ? _EmptyFilter(tab: _activeTab)
+                  : _TaskList(
+                      tasks: filtered,
+                      isAdmin: isAdmin,
+                      classId: classId,
                     ),
-                    Expanded(
-                      child: allTasks.isEmpty
-                          ? _EmptyState(
-                              isAdmin: isAdmin, classId: activeClass.id)
-                          : filtered.isEmpty
-                              ? _EmptyFilter(tab: _activeTab)
-                              : _TaskList(
-                                  tasks: filtered,
-                                  isAdmin: isAdmin,
-                                  classId: activeClass.id,
-                                ),
-                    ),
-                  ],
-                ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Filter banner ──────────────────────────────────────────────
+
+class _FilterBanner extends StatelessWidget {
+  final String text;
+
+  const _FilterBanner({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: AppColors.primaryOverlay,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.filter_alt, size: 13, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 10.5,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

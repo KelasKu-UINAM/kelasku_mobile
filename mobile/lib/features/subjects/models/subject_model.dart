@@ -7,6 +7,10 @@ class SubjectModel {
   final String name;
   final String? lecturer;
   final String? code;
+
+  /// Whether the current user marked this subject as one they take.
+  /// Comes from the backend's per-user `is_followed` flag.
+  final bool isFollowed;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -16,6 +20,7 @@ class SubjectModel {
     required this.name,
     this.lecturer,
     this.code,
+    this.isFollowed = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -27,6 +32,7 @@ class SubjectModel {
       name: json['name'] as String? ?? '',
       lecturer: json['lecturer'] as String?,
       code: json['code'] as String?,
+      isFollowed: json['is_followed'] == true,
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
     );
@@ -44,6 +50,7 @@ class SubjectModel {
     String? name,
     String? lecturer,
     String? code,
+    bool? isFollowed,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -53,6 +60,7 @@ class SubjectModel {
       name: name ?? this.name,
       lecturer: lecturer ?? this.lecturer,
       code: code ?? this.code,
+      isFollowed: isFollowed ?? this.isFollowed,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

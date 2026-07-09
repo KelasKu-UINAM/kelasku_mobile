@@ -8,6 +8,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/providers/class_provider.dart';
+import '../../subjects/providers/subject_provider.dart';
 import '../models/schedule_model.dart';
 import '../providers/schedule_provider.dart';
 
@@ -76,8 +77,14 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
     super.dispose();
   }
 
-  void _fetchSchedulesFor(int classId) {
-    ref.read(scheduleProvider(classId).notifier).fetchSchedules();
+  // Deferred to a microtask: mutating providers synchronously during build
+  // notifies listeners mid-build. Safe to call every rebuild because both
+  // notifiers guard with _loaded/_inFlight.
+  void _fetchDataFor(int classId) {
+    Future.microtask(() {
+      ref.read(scheduleProvider(classId).notifier).fetchSchedules();
+      ref.read(subjectProvider(classId).notifier).fetchSubjects();
+    });
   }
 
   @override
@@ -121,9 +128,12 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
     final activeClass = ref.watch(activeClassProvider) ?? classes.first;
     final isAdmin = activeClass.roleInClass == 'admin_komting';
 
-    _fetchSchedulesFor(activeClass.id);
+    _fetchDataFor(activeClass.id);
 
     final scheduleState = ref.watch(scheduleProvider(activeClass.id));
+    final subjectState = ref.watch(subjectProvider(activeClass.id));
+    final followedCount =
+        ref.watch(followedSubjectCountProvider(activeClass.id));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -142,6 +152,19 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: scheduleState.followedOnly
+                ? 'Tampilkan semua mata kuliah'
+                : 'Hanya mata kuliah yang diikuti',
+            icon: Icon(
+              scheduleState.followedOnly
+                  ? Icons.filter_alt
+                  : Icons.filter_alt_off,
+            ),
+            onPressed: () => ref
+                .read(scheduleProvider(activeClass.id).notifier)
+                .setFollowedOnly(!scheduleState.followedOnly),
+          ),
           IconButton(
             tooltip: 'Mata Kuliah',
             icon: const Icon(Icons.menu_book_outlined),
@@ -174,27 +197,124 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
           tabs: _dayLabels.map((d) => Tab(text: d)).toList(),
         ),
       ),
-      body: scheduleState.isLoading
-          ? const LoadingWidget(message: 'Memuat jadwal...')
-          : scheduleState.error != null && scheduleState.schedules.isEmpty
-              ? ErrorStateWidget(
-                  message: scheduleState.error!,
-                  onRetry: () => ref
-                      .read(scheduleProvider(activeClass.id).notifier)
-                      .fetchSchedules(forceRefresh: true),
+      body: _buildBody(
+        activeClass.id,
+        isAdmin,
+        scheduleState,
+        subjectState,
+        followedCount,
+      ),
+    );
+  }
+
+  /// Renders loading / error / three distinct empty situations:
+  /// class has no subjects at all, user follows none (filter active),
+  /// or subjects+follows exist but simply no schedules on a day.
+  Widget _buildBody(
+    int classId,
+    bool isAdmin,
+    ScheduleState scheduleState,
+    SubjectState subjectState,
+    int followedCount,
+  ) {
+    if (scheduleState.isLoading ||
+        (subjectState.isLoading && subjectState.subjects.isEmpty)) {
+      return const LoadingWidget(message: 'Memuat jadwal...');
+    }
+
+    if (scheduleState.error != null && scheduleState.schedules.isEmpty) {
+      return ErrorStateWidget(
+        message: scheduleState.error!,
+        onRetry: () {
+          ref
+              .read(scheduleProvider(classId).notifier)
+              .fetchSchedules(forceRefresh: true);
+          ref
+              .read(subjectProvider(classId).notifier)
+              .fetchSubjects(forceRefresh: true);
+        },
+      );
+    }
+
+    // Class truly has no subjects yet — schedules can't exist either.
+    if (subjectState.subjects.isEmpty && !subjectState.isLoading) {
+      return EmptyStateWidget(
+        icon: Icons.menu_book_outlined,
+        title: 'Belum ada mata kuliah',
+        description: isAdmin
+            ? 'Tambahkan mata kuliah dulu, lalu susun jadwalnya.'
+            : 'Komting belum menambahkan mata kuliah di kelas ini.',
+        actionLabel: isAdmin ? 'Kelola Mata Kuliah' : null,
+        onAction: isAdmin ? () => context.push('/matkul/$classId') : null,
+      );
+    }
+
+    // Subjects exist but the user follows none while filtering.
+    if (scheduleState.followedOnly && followedCount == 0) {
+      return EmptyStateWidget(
+        icon: Icons.bookmark_add_outlined,
+        title: 'Belum ada mata kuliah yang diikuti',
+        description:
+            'Tandai mata kuliah yang kamu ambil untuk melihat jadwalnya di sini.',
+        actionLabel: 'Pilih Mata Kuliah',
+        onAction: () => context.push('/matkul/$classId'),
+      );
+    }
+
+    return Column(
+      children: [
+        if (scheduleState.followedOnly)
+          _FilterBanner(
+            text: 'Menampilkan: mata kuliah yang diikuti ($followedCount)',
+          ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: _dayKeys
+                .map(
+                  (day) => _DayScheduleList(
+                    classId: classId,
+                    day: day,
+                    isAdmin: isAdmin,
+                  ),
                 )
-              : TabBarView(
-                  controller: _tabController,
-                  children: _dayKeys
-                      .map(
-                        (day) => _DayScheduleList(
-                          classId: activeClass.id,
-                          day: day,
-                          isAdmin: isAdmin,
-                        ),
-                      )
-                      .toList(),
-                ),
+                .toList(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Filter banner ──────────────────────────────────────────────
+
+class _FilterBanner extends StatelessWidget {
+  final String text;
+
+  const _FilterBanner({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: AppColors.primaryOverlay,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.filter_alt, size: 13, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 10.5,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

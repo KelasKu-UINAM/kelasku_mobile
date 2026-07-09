@@ -9,6 +9,8 @@ import '../../../core/widgets/error_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../../classes/models/class_model.dart';
 import '../../classes/providers/class_provider.dart';
+import '../../schedules/providers/schedule_provider.dart';
+import '../../tasks/providers/task_provider.dart';
 import '../models/subject_model.dart';
 import '../providers/subject_provider.dart';
 
@@ -132,81 +134,152 @@ class _SubjectCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+      padding: const EdgeInsets.fromLTRB(14, 13, 12, 8),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  subject.name,
-                  style: AppTextStyles.sectionTitle.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.2,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (subject.code != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subject.code!,
-                    style: AppTextStyles.caption.copyWith(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                      letterSpacing: 0.4,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ],
-                if (subject.lecturer != null) ...[
-                  const SizedBox(height: 7),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.person_outline,
-                        size: 13,
-                        color: AppColors.textMuted,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subject.name,
+                      style: AppTextStyles.sectionTitle.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
                       ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          subject.lecturer!,
-                          style: AppTextStyles.caption.copyWith(fontSize: 11.5),
-                          overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subject.code != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subject.code!,
+                        style: AppTextStyles.caption.copyWith(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                          letterSpacing: 0.4,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ],
+                    if (subject.lecturer != null) ...[
+                      const SizedBox(height: 7),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.person_outline,
+                            size: 13,
+                            color: AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              subject.lecturer!,
+                              style: AppTextStyles.caption
+                                  .copyWith(fontSize: 11.5),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (isAdmin) ...[
+                const SizedBox(width: 6),
+                _ActionIconBtn(
+                  icon: Icons.edit_outlined,
+                  onTap: () => context.push(
+                    '/matkul/${subject.id}/edit?classId=$classId',
+                  ),
+                ),
+                const SizedBox(width: 4),
+                _ActionIconBtn(
+                  icon: Icons.delete_outline,
+                  onTap: () => _confirmDelete(context, ref),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 0.5, thickness: 0.5),
+          // Personal follow toggle — filters Jadwal & Tugas to the subjects
+          // the user actually takes.
+          InkWell(
+            onTap: () => _toggleFollow(context, ref),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    subject.isFollowed
+                        ? Icons.bookmark_added
+                        : Icons.bookmark_add_outlined,
+                    size: 16,
+                    color: subject.isFollowed
+                        ? AppColors.primary
+                        : AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Saya mengikuti mata kuliah ini',
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: subject.isFollowed
+                            ? AppColors.primary
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: subject.isFollowed,
+                    activeThumbColor: AppColors.primary,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (_) => _toggleFollow(context, ref),
                   ),
                 ],
-              ],
-            ),
-          ),
-          if (isAdmin) ...[
-            const SizedBox(width: 6),
-            _ActionIconBtn(
-              icon: Icons.edit_outlined,
-              onTap: () => context.push(
-                '/matkul/${subject.id}/edit?classId=$classId',
               ),
             ),
-            const SizedBox(width: 4),
-            _ActionIconBtn(
-              icon: Icons.delete_outline,
-              onTap: () => _confirmDelete(context, ref),
-            ),
-          ],
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _toggleFollow(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await ref
+        .read(subjectProvider(classId).notifier)
+        .toggleFollow(subject.id);
+    if (!ok) {
+      final error = ref.read(subjectProvider(classId)).error;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Gagal mengubah status mengikuti.'),
+        ),
+      );
+      return;
+    }
+
+    // Jadwal & Tugas are filtered by follows and cache their last fetch —
+    // refresh them so the change is visible immediately.
+    ref
+        .read(scheduleProvider(classId).notifier)
+        .fetchSchedules(forceRefresh: true);
+    ref.read(taskProvider(classId).notifier).fetchTasks(forceRefresh: true);
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {

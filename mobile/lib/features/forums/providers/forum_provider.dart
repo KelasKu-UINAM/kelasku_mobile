@@ -39,9 +39,12 @@ class ForumNotifier extends StateNotifier<ForumState> {
 
   final int _classId;
   bool _loaded = false;
+  bool _inFlight = false;
 
   Future<void> fetchForums({bool forceRefresh = false}) async {
+    if (_inFlight) return;
     if (_loaded && !forceRefresh) return;
+    _inFlight = true;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await ApiClient.instance.get(
@@ -63,6 +66,8 @@ class ForumNotifier extends StateNotifier<ForumState> {
         isLoading: false,
         error: 'Terjadi kesalahan. Coba lagi.',
       );
+    } finally {
+      _inFlight = false;
     }
   }
 

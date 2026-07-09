@@ -40,8 +40,16 @@ class SubjectNotifier extends StateNotifier<SubjectState> {
 
   final int _classId;
 
+  // _loaded (not subjects.isNotEmpty!) marks a completed fetch: an empty
+  // class would otherwise refetch on every rebuild. _inFlight prevents
+  // concurrent duplicate requests from rebuilds during a fetch.
+  bool _loaded = false;
+  bool _inFlight = false;
+
   Future<void> fetchSubjects({bool forceRefresh = false}) async {
-    if (!forceRefresh && state.subjects.isNotEmpty) return;
+    if (_inFlight) return;
+    if (_loaded && !forceRefresh) return;
+    _inFlight = true;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await ApiClient.instance.get(
@@ -52,6 +60,7 @@ class SubjectNotifier extends StateNotifier<SubjectState> {
           .map((e) => SubjectModel.fromJson(e as Map<String, dynamic>))
           .toList();
       state = state.copyWith(subjects: subjects, isLoading: false);
+      _loaded = true;
     } on DioException catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -62,6 +71,49 @@ class SubjectNotifier extends StateNotifier<SubjectState> {
         isLoading: false,
         error: 'Terjadi kesalahan. Coba lagi.',
       );
+    } finally {
+      _inFlight = false;
+    }
+  }
+
+  /// Toggles the personal "I take this subject" mark with an optimistic
+  /// update; rolls back and sets [SubjectState.error] on failure.
+  Future<bool> toggleFollow(int subjectId) async {
+    final index = state.subjects.indexWhere((s) => s.id == subjectId);
+    if (index == -1) return false;
+
+    final before = state.subjects[index];
+    final target = !before.isFollowed;
+
+    List<SubjectModel> withFollow(bool value) => [
+          for (final s in state.subjects)
+            if (s.id == subjectId) s.copyWith(isFollowed: value) else s,
+        ];
+
+    state = state.copyWith(subjects: withFollow(target));
+    try {
+      if (target) {
+        await ApiClient.instance.post(
+          '${ApiConstants.subjects}/$subjectId/follow',
+        );
+      } else {
+        await ApiClient.instance.delete(
+          '${ApiConstants.subjects}/$subjectId/follow',
+        );
+      }
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        subjects: withFollow(before.isFollowed),
+        error: extractErrorMessage(e),
+      );
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        subjects: withFollow(before.isFollowed),
+        error: 'Terjadi kesalahan. Coba lagi.',
+      );
+      return false;
     }
   }
 
@@ -179,4 +231,12 @@ final subjectProvider =
 
 final subjectListProvider = Provider.family<List<SubjectModel>, int>(
   (ref, classId) => ref.watch(subjectProvider(classId)).subjects,
+);
+
+/// How many subjects in the class the current user follows.
+final followedSubjectCountProvider = Provider.family<int, int>(
+  (ref, classId) => ref
+      .watch(subjectListProvider(classId))
+      .where((s) => s.isFollowed)
+      .length,
 );

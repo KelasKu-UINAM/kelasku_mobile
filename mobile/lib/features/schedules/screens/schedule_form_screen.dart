@@ -189,7 +189,7 @@ class _ScheduleFormScreenState extends ConsumerState<ScheduleFormScreen> {
         reminderMinutesBefore: _reminderMinutes,
       );
     } else {
-      final created = await notifier.createSchedule(
+      ok = await notifier.createSchedule(
         subjectId: _selectedSubject!.id,
         subjectName: _selectedSubject!.name,
         lecturer: _selectedSubject!.lecturer,
@@ -200,7 +200,6 @@ class _ScheduleFormScreenState extends ConsumerState<ScheduleFormScreen> {
         room: _roomCtrl.text.trim().isEmpty ? null : _roomCtrl.text.trim(),
         reminderMinutesBefore: _reminderMinutes,
       );
-      ok = created != null;
     }
 
     if (!mounted) return;

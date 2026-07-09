@@ -12,21 +12,28 @@ class TaskState {
   final bool isLoading;
   final String? error;
 
+  /// When true (default) only tasks of followed subjects are listed;
+  /// the AppBar filter toggle switches this off to show all.
+  final bool followedOnly;
+
   const TaskState({
     this.tasks = const [],
     this.isLoading = false,
     this.error,
+    this.followedOnly = true,
   });
 
   TaskState copyWith({
     List<TaskModel>? tasks,
     bool? isLoading,
     String? error,
+    bool? followedOnly,
   }) {
     return TaskState(
       tasks: tasks ?? this.tasks,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      followedOnly: followedOnly ?? this.followedOnly,
     );
   }
 }
@@ -37,12 +44,22 @@ class TaskNotifier extends StateNotifier<TaskState> {
   final int _classId;
   bool _loaded = false;
 
+  // Prevents rebuild-triggered duplicate fetches while one is in flight
+  // (without this, a failed fetch could flap loading↔error forever when
+  // the screen retriggers fetch from build).
+  bool _inFlight = false;
+
   Future<void> fetchTasks({bool forceRefresh = false}) async {
+    if (_inFlight) return;
     if (_loaded && !forceRefresh) return;
+    _inFlight = true;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await ApiClient.instance.get(
         '${ApiConstants.classes}/$_classId/tasks',
+        queryParameters: {
+          if (state.followedOnly) 'followed_only': 'true',
+        },
       );
       final data = extractData(response) as List<dynamic>;
       final tasks = data
@@ -60,7 +77,15 @@ class TaskNotifier extends StateNotifier<TaskState> {
         isLoading: false,
         error: 'Terjadi kesalahan. Coba lagi.',
       );
+    } finally {
+      _inFlight = false;
     }
+  }
+
+  Future<void> setFollowedOnly(bool value) async {
+    if (state.followedOnly == value) return;
+    state = state.copyWith(followedOnly: value);
+    await fetchTasks(forceRefresh: true);
   }
 
   /// Returns true on success; on failure sets [TaskState.error] and
